@@ -1,5 +1,7 @@
 # Snit
 
+[![Build and test](https://github.com/sennacools/snit-video-editor/actions/workflows/build.yml/badge.svg)](https://github.com/sennacools/snit-video-editor/actions/workflows/build.yml)
+
 **Snit** is a small desktop video editor for Windows, in the style of Adobe Premiere.
 It's built with C#, WPF and FFmpeg.
 

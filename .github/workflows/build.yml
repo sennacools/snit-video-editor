@@ -1,0 +1,28 @@
+# Builds Snit and runs the tests on GitHub's Windows machines after every push.
+# The result shows up as a green tick (or red cross) next to each commit.
+name: Build and test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      # FFmpeg lets the media tests run too (they are skipped without it).
+      - name: Install FFmpeg
+        run: choco install ffmpeg --no-progress -y
+
+      - name: Build
+        run: dotnet build Snit.slnx --configuration Release
+
+      - name: Test
+        run: dotnet test Snit.slnx --configuration Release --no-build

@@ -1,6 +1,6 @@
 # Snit
 
-**Snit** ("cut" in Dutch) is a small desktop video editor for Windows, in the style of Adobe Premiere.
+**Snit** is a small desktop video editor for Windows, in the style of Adobe Premiere.
 It's built with C#, WPF and FFmpeg.
 
 ![Snit main window](docs/screenshot.png)

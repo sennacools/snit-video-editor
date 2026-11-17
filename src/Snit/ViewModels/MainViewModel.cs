@@ -84,6 +84,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
     private void OnTimelineContentChanged()
     {
         IsDirty = true;
+        ExportCommand.NotifyCanExecuteChanged(); // Export is only possible with something on the timeline
         playback.UpdateTimeline(project);
         if (!IsPlaying) playback.Seek(Timeline.PlayheadFrame);
     }
@@ -238,11 +239,32 @@ public partial class MainViewModel : ObservableObject, IDisposable
         playback = CreatePlayer(project);
 
         IsDirty = false;
+        ExportCommand.NotifyCanExecuteChanged();
         OnPropertyChanged(nameof(PreviewImage));
         OnPropertyChanged(nameof(PreviewQualityText));
         OnPropertyChanged(nameof(ProjectName));
         OnPropertyChanged(nameof(ProjectInfo));
         OnPropertyChanged(nameof(WindowTitle));
+    }
+
+    // ===================== Export =====================
+
+    /// <summary>The window listens to this and opens the export dialog.</summary>
+    public event Action<ExportViewModel>? ExportRequested;
+
+    private bool CanExport() => Timeline.DurationFrames > 0;
+
+    [RelayCommand(CanExecute = nameof(CanExport))]
+    private void Export()
+    {
+        if (!FFmpegLocator.Current.IsAvailable)
+        {
+            MessageBox.Show("Snit needs FFmpeg to export.\n\nInstall it with:\n" + FFmpegLocator.InstallCommand,
+                "FFmpeg missing", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+        if (IsPlaying) PlayPause();
+        ExportRequested?.Invoke(new ExportViewModel(project, PreviewImage));
     }
 
     // ===================== FFmpeg check =====================

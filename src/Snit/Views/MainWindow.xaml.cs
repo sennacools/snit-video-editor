@@ -21,6 +21,7 @@ public partial class MainWindow : Window
         InitializeComponent();
         DataContext = viewModel;
 
+        viewModel.ExportRequested += exportViewModel => new ExportWindow(exportViewModel) { Owner = this }.ShowDialog();
         Loaded += OnLoaded;
         StateChanged += (_, _) => UpdateMaximizedLook();
         Closed += (_, _) => viewModel.Dispose();
@@ -85,6 +86,7 @@ public partial class MainWindow : Window
             (Key.S, true, false) => viewModel.SaveCommand,
             (Key.S, true, true) => viewModel.SaveAsCommand,
             (Key.I, true, false) => viewModel.Bin.ImportCommand,
+            (Key.M, true, false) => viewModel.ExportCommand,
             (Key.OemPlus or Key.Add, false, _) => tl.ZoomInCommand,
             (Key.OemMinus or Key.Subtract, false, _) => tl.ZoomOutCommand,
             _ => null,

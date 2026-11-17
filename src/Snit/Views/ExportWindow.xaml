@@ -1,0 +1,186 @@
+<!--
+    The Export dialog (about 640 × 560). Settings on the left, a preview and summary on
+    the right, progress and buttons at the bottom.
+-->
+<Window x:Class="Snit.Views.ExportWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Export"
+        Width="664" Height="584"
+        WindowStyle="None" AllowsTransparency="True" Background="Transparent"
+        ResizeMode="NoResize" ShowInTaskbar="False" WindowStartupLocation="CenterOwner"
+        Foreground="{StaticResource TextBrush}" FontFamily="{StaticResource UiFont}" FontSize="12"
+        UseLayoutRounding="True">
+    <Window.Resources>
+        <Style x:Key="FieldLabel" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{StaticResource MutedTextBrush}"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="Margin" Value="0,12,0,5"/>
+        </Style>
+        <Style x:Key="SummaryRow" TargetType="DockPanel">
+            <Setter Property="Margin" Value="0,0,0,8"/>
+        </Style>
+        <!-- Dropdown items that aren't built yet can't be picked. -->
+        <Style x:Key="ChoiceItem" TargetType="ComboBoxItem" BasedOn="{StaticResource {x:Type ComboBoxItem}}">
+            <Setter Property="IsEnabled" Value="{Binding IsAvailable}"/>
+        </Style>
+    </Window.Resources>
+
+    <!-- 12 px of transparent space around the dialog, for its shadow. -->
+    <Border Margin="12" Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}"
+            BorderThickness="1" CornerRadius="10">
+        <Border.Effect>
+            <DropShadowEffect BlurRadius="20" ShadowDepth="4" Opacity="0.5" Color="Black"/>
+        </Border.Effect>
+
+        <DockPanel>
+            <!-- ===== Title (drag the dialog by it) ===== -->
+            <Border DockPanel.Dock="Top" Height="48" Padding="20,0,10,0" Background="Transparent"
+                    BorderBrush="{StaticResource RowDividerBrush}" BorderThickness="0,0,0,1"
+                    MouseLeftButtonDown="Title_MouseLeftButtonDown">
+                <DockPanel>
+                    <Button DockPanel.Dock="Right" Style="{StaticResource IconButton}" Content="&#xE711;" FontSize="11"
+                            Command="{Binding CancelCommand}" ToolTip="Close"/>
+                    <TextBlock Text="Export" FontSize="15" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                </DockPanel>
+            </Border>
+
+            <!-- ===== Buttons ===== -->
+            <Border DockPanel.Dock="Bottom" Padding="20,12" BorderBrush="{StaticResource RowDividerBrush}" BorderThickness="0,1,0,0">
+                <DockPanel>
+                    <Button DockPanel.Dock="Right" Style="{StaticResource AccentButton}" Content="Export" MinWidth="96"
+                            Command="{Binding ExportCommand}" IsDefault="True"/>
+                    <Button DockPanel.Dock="Right" Content="{Binding CancelButtonText}" MinWidth="80" Margin="0,0,8,0"
+                            Command="{Binding CancelCommand}" IsCancel="True"/>
+                    <Button Content="Show in folder" HorizontalAlignment="Left" Command="{Binding ShowInFolderCommand}"
+                            Visibility="{Binding IsDone, Converter={StaticResource BoolToVisibility}}"/>
+                </DockPanel>
+            </Border>
+
+            <!-- ===== Progress ===== -->
+            <StackPanel DockPanel.Dock="Bottom" Margin="20,0,20,14">
+                <ProgressBar Value="{Binding ProgressValue, Mode=OneWay}"/>
+                <DockPanel Margin="0,6,0,0">
+                    <TextBlock DockPanel.Dock="Right" Text="{Binding TimeLeftText}" Style="{StaticResource MutedText}"/>
+                    <TextBlock Text="{Binding ProgressText}" Style="{StaticResource TimecodeText}" FontSize="11"/>
+                </DockPanel>
+                <TextBlock Text="{Binding StatusText}" TextWrapping="Wrap" Margin="0,6,0,0" MaxHeight="64">
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="Foreground" Value="{StaticResource MeterGreenBrush}"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsError}" Value="True">
+                                    <Setter Property="Foreground" Value="{StaticResource PlayheadBrush}"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
+            </StackPanel>
+
+            <!-- ===== Settings | preview + summary ===== -->
+            <Grid Margin="20,4,20,10">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="24"/>
+                    <ColumnDefinition Width="220"/>
+                </Grid.ColumnDefinitions>
+
+                <StackPanel IsEnabled="{Binding IsSettingsEnabled}">
+                    <TextBlock Text="File name" Style="{StaticResource FieldLabel}"/>
+                    <TextBox Text="{Binding FileName, UpdateSourceTrigger=PropertyChanged}"/>
+
+                    <TextBlock Text="Save to" Style="{StaticResource FieldLabel}"/>
+                    <DockPanel>
+                        <Button DockPanel.Dock="Right" Content="Browse…" Margin="6,0,0,0" Command="{Binding BrowseCommand}"/>
+                        <TextBox Text="{Binding Folder}" IsReadOnly="True" ToolTip="{Binding Folder}"/>
+                    </DockPanel>
+
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="10"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel>
+                            <TextBlock Text="Format" Style="{StaticResource FieldLabel}"/>
+                            <ComboBox ItemsSource="{Binding Formats}" SelectedItem="{Binding SelectedFormat}"
+                                      DisplayMemberPath="Label" ItemContainerStyle="{StaticResource ChoiceItem}"/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="2">
+                            <TextBlock Text="Resolution" Style="{StaticResource FieldLabel}"/>
+                            <ComboBox ItemsSource="{Binding Resolutions}" SelectedItem="{Binding SelectedResolution}"
+                                      DisplayMemberPath="Label" ItemContainerStyle="{StaticResource ChoiceItem}"/>
+                        </StackPanel>
+                    </Grid>
+
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="10"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel>
+                            <TextBlock Text="Frame rate" Style="{StaticResource FieldLabel}"/>
+                            <ComboBox ItemsSource="{Binding FrameRates}" SelectedItem="{Binding SelectedFrameRate}"
+                                      DisplayMemberPath="Label" ItemContainerStyle="{StaticResource ChoiceItem}"/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="2">
+                            <TextBlock Text="Range" Style="{StaticResource FieldLabel}"/>
+                            <Border Background="{StaticResource InputBrush}" CornerRadius="6" Padding="2" Height="32">
+                                <UniformGrid Columns="2">
+                                    <RadioButton Style="{StaticResource SegmentButton}" Content="Whole sequence"
+                                                 HorizontalContentAlignment="Center" IsChecked="{Binding WholeSequence}"/>
+                                    <RadioButton Style="{StaticResource SegmentButton}" Content="In to out" IsEnabled="False"
+                                                 ToolTipService.ShowOnDisabled="True" ToolTip="In and out points come in a later phase"
+                                                 Opacity="0.45"/>
+                                </UniformGrid>
+                            </Border>
+                        </StackPanel>
+                    </Grid>
+
+                    <TextBlock Text="Quality" Style="{StaticResource FieldLabel}"/>
+                    <DockPanel>
+                        <TextBlock DockPanel.Dock="Right" Text="{Binding BitrateText}" Style="{StaticResource TimecodeText}"
+                                   FontSize="11" Width="70" TextAlignment="Right"/>
+                        <Slider Minimum="0" Maximum="100" Value="{Binding Quality}" Margin="0,0,8,0"/>
+                    </DockPanel>
+
+                    <CheckBox Margin="0,16,0,0" IsChecked="{Binding UseGpu}" IsEnabled="{Binding IsGpuAvailable}">
+                        <StackPanel>
+                            <TextBlock Text="Use GPU encoding when available"/>
+                            <TextBlock Text="{Binding GpuStatus}" Style="{StaticResource MutedText}" Margin="0,2,0,0"/>
+                        </StackPanel>
+                    </CheckBox>
+                </StackPanel>
+
+                <!-- Preview and summary -->
+                <StackPanel Grid.Column="2">
+                    <TextBlock Text="Preview" Style="{StaticResource FieldLabel}"/>
+                    <Border CornerRadius="6" Background="Black" ClipToBounds="True" Height="124">
+                        <Image Source="{Binding Preview}" Stretch="Uniform"/>
+                    </Border>
+
+                    <TextBlock Text="Summary" Style="{StaticResource FieldLabel}" Margin="0,18,0,8"/>
+                    <DockPanel Style="{StaticResource SummaryRow}">
+                        <TextBlock DockPanel.Dock="Right" Text="{Binding DurationText}" Style="{StaticResource TimecodeText}" FontSize="11"/>
+                        <TextBlock Text="Duration" Foreground="{StaticResource MutedTextBrush}"/>
+                    </DockPanel>
+                    <DockPanel Style="{StaticResource SummaryRow}">
+                        <TextBlock DockPanel.Dock="Right" Text="{Binding VideoSummary}" Foreground="{StaticResource SecondaryTextBrush}"/>
+                        <TextBlock Text="Video" Foreground="{StaticResource MutedTextBrush}"/>
+                    </DockPanel>
+                    <DockPanel Style="{StaticResource SummaryRow}">
+                        <TextBlock DockPanel.Dock="Right" Text="{Binding AudioSummary}" Foreground="{StaticResource SecondaryTextBrush}"/>
+                        <TextBlock Text="Audio" Foreground="{StaticResource MutedTextBrush}"/>
+                    </DockPanel>
+                    <DockPanel Style="{StaticResource SummaryRow}">
+                        <TextBlock DockPanel.Dock="Right" Text="{Binding EstimatedSize}" Foreground="{StaticResource TextBrush}"
+                                   FontWeight="SemiBold"/>
+                        <TextBlock Text="Estimated size" Foreground="{StaticResource MutedTextBrush}"/>
+                    </DockPanel>
+                </StackPanel>
+            </Grid>
+        </DockPanel>
+    </Border>
+</Window>

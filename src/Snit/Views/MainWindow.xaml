@@ -61,7 +61,7 @@
                         <MenuItem Header="Save as…" InputGestureText="Ctrl+Shift+S" Command="{Binding SaveAsCommand}"/>
                         <Separator/>
                         <MenuItem Header="Import media…" InputGestureText="Ctrl+I" Command="{Binding Bin.ImportCommand}"/>
-                        <MenuItem Header="Export…" InputGestureText="Ctrl+M" IsEnabled="False"/>
+                        <MenuItem Header="Export…" InputGestureText="Ctrl+M" Command="{Binding ExportCommand}"/>
                         <Separator/>
                         <MenuItem Header="Exit" Command="{Binding ExitCommand}"/>
                     </MenuItem>
@@ -111,11 +111,11 @@
                     </StackPanel>
                 </Border>
 
-                <!-- Export (the dialog arrives in phase 3) -->
+                <!-- Export -->
                 <Button Grid.Column="4" Style="{StaticResource AccentButton}" Margin="0,0,8,0"
-                        VerticalAlignment="Center" IsEnabled="False"
+                        VerticalAlignment="Center" Command="{Binding ExportCommand}"
                         WindowChrome.IsHitTestVisibleInChrome="True"
-                        ToolTipService.ShowOnDisabled="True" ToolTip="Export is not built yet">
+                        ToolTipService.ShowOnDisabled="True" ToolTip="Export the timeline as a video (Ctrl+M)">
                     <StackPanel Orientation="Horizontal">
                         <TextBlock Text="&#xE898;" Style="{StaticResource IconText}" FontSize="12" Margin="0,0,7,0"/>
                         <TextBlock Text="Export"/>

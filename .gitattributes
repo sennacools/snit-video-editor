@@ -1,0 +1,13 @@
+# Store text files with LF line endings in the repo; Git converts them for each computer.
+* text=auto
+
+# Windows-only files keep CRLF.
+*.sln   text eol=crlf
+*.slnx  text eol=crlf
+*.bat   text eol=crlf
+*.cmd   text eol=crlf
+
+# Never touch binary files.
+*.png   binary
+*.jpg   binary
+*.ico   binary

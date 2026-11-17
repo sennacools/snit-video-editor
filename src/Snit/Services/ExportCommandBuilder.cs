@@ -37,7 +37,8 @@ public static class ExportCommandBuilder
         string fps = ProcessRunner.Num(settings.FrameRate);
         string Sec(long frames) => ProcessRunner.Num(frames / projectFps);
 
-        var args = new List<string> { "-hide_banner", "-nostdin", "-y" };
+        // No -nostdin here: the exporter sends "q" on stdin to stop ffmpeg.
+        var args = new List<string> { "-hide_banner", "-y" };
         var filters = new List<string>();
         int input = 0;
 

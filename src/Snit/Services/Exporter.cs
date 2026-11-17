@@ -30,6 +30,7 @@ public sealed class Exporter
 
         var startInfo = new ProcessStartInfo(ffmpeg)
         {
+            RedirectStandardInput = true, // so we can send "q" to stop it
             RedirectStandardOutput = true,
             RedirectStandardError = true,
             UseShellExecute = false,
@@ -68,8 +69,7 @@ public sealed class Exporter
         }
         catch (OperationCanceledException)
         {
-            try { process.Kill(entireProcessTree: true); } catch { /* already stopped */ }
-            await process.WaitForExitAsync(CancellationToken.None);
+            await StopAsync(process);
             TryDelete(output); // don't leave a broken half-written video behind
             throw;
         }
@@ -85,6 +85,39 @@ public sealed class Exporter
         }
 
         progress?.Report(new ExportProgress(plan.TotalFrames, plan.TotalFrames, clock.Elapsed));
+    }
+
+    /// <summary>
+    /// Stops ffmpeg. First the polite way: typing "q" is ffmpeg's own "stop" key, and it also
+    /// reaches ffmpeg when it is started through a launcher (like Chocolatey's). If it hasn't
+    /// stopped after 3 seconds, we force it.
+    /// </summary>
+    private static async Task StopAsync(Process process)
+    {
+        try
+        {
+            await process.StandardInput.WriteAsync("q");
+            await process.StandardInput.FlushAsync();
+        }
+        catch (IOException) { /* already gone */ }
+        catch (InvalidOperationException) { }
+
+        using var grace = new CancellationTokenSource(TimeSpan.FromSeconds(3));
+        try
+        {
+            await process.WaitForExitAsync(grace.Token);
+            return;
+        }
+        catch (OperationCanceledException) { }
+
+        try { process.Kill(entireProcessTree: true); }
+        catch (Exception)
+        {
+            // Some part of the process tree couldn't be stopped; at least stop the main one.
+            try { process.Kill(); } catch (Exception) { /* already gone */ }
+        }
+        using var last = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        try { await process.WaitForExitAsync(last.Token); } catch (OperationCanceledException) { }
     }
 
     private static void TryDelete(string path)

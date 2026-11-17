@@ -230,7 +230,7 @@
             <Setter.Value>
                 <ControlTemplate TargetType="RadioButton">
                     <Border x:Name="Bd" Background="Transparent" CornerRadius="5" Padding="{TemplateBinding Padding}">
-                        <ContentPresenter VerticalAlignment="Center"/>
+                        <ContentPresenter VerticalAlignment="Center" HorizontalAlignment="Center"/>
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
@@ -444,8 +444,11 @@
                                 </ControlTemplate>
                             </ToggleButton.Template>
                         </ToggleButton>
+                        <!-- ItemTemplateSelector makes DisplayMemberPath ("show this property") work here too. -->
                         <ContentPresenter Content="{TemplateBinding SelectionBoxItem}"
                                           ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"
+                                          ContentTemplateSelector="{TemplateBinding ItemTemplateSelector}"
+                                          ContentStringFormat="{TemplateBinding SelectionBoxItemStringFormat}"
                                           Margin="10,0,30,0" VerticalAlignment="Center" IsHitTestVisible="False"/>
                         <Popup x:Name="PART_Popup" Placement="Bottom" VerticalOffset="4" AllowsTransparency="True"
                                Focusable="False" PopupAnimation="None"

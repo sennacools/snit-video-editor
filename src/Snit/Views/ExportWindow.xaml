@@ -116,9 +116,9 @@
 
                     <Grid>
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="0.7*"/>
                             <ColumnDefinition Width="10"/>
-                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="1.3*"/>
                         </Grid.ColumnDefinitions>
                         <StackPanel>
                             <TextBlock Text="Frame rate" Style="{StaticResource FieldLabel}"/>
@@ -129,9 +129,10 @@
                             <TextBlock Text="Range" Style="{StaticResource FieldLabel}"/>
                             <Border Background="{StaticResource InputBrush}" CornerRadius="6" Padding="2" Height="32">
                                 <UniformGrid Columns="2">
-                                    <RadioButton Style="{StaticResource SegmentButton}" Content="Whole sequence"
-                                                 HorizontalContentAlignment="Center" IsChecked="{Binding WholeSequence}"/>
+                                    <RadioButton Style="{StaticResource SegmentButton}" Content="Whole sequence" Padding="4,3"
+                                                 FontSize="11" IsChecked="{Binding WholeSequence}"/>
                                     <RadioButton Style="{StaticResource SegmentButton}" Content="In to out" IsEnabled="False"
+                                                 Padding="4,3" FontSize="11"
                                                  ToolTipService.ShowOnDisabled="True" ToolTip="In and out points come in a later phase"
                                                  Opacity="0.45"/>
                                 </UniformGrid>

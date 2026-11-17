@@ -25,4 +25,17 @@ jobs:
         run: dotnet build Snit.slnx --configuration Release
 
       - name: Test
-        run: dotnet test Snit.slnx --configuration Release --no-build
+        run: dotnet test Snit.slnx --configuration Release --no-build --logger "trx;LogFileName=results.trx"
+
+      # If a test fails, show its name and message right on the GitHub page.
+      - name: Show failed tests
+        if: failure()
+        shell: pwsh
+        run: |
+          Get-ChildItem -Recurse -Filter results.trx | ForEach-Object {
+            [xml]$results = Get-Content $_.FullName
+            $results.TestRun.Results.UnitTestResult | Where-Object outcome -eq 'Failed' | ForEach-Object {
+              $message = ($_.Output.ErrorInfo.Message -replace "`r?`n", ' ')
+              Write-Output "::error title=$($_.testName)::$message"
+            }
+          }

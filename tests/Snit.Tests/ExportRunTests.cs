@@ -54,7 +54,7 @@ public class ExportRunTests(TestMedia media) : IClassFixture<TestMedia>
         using var cancel = new CancellationTokenSource(TimeSpan.FromSeconds(1.5));
         var watch = Stopwatch.StartNew();
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => new Exporter().RunAsync(plan, null, cancel.Token));
-        Assert.True(watch.Elapsed < TimeSpan.FromSeconds(10));
-        Assert.False(File.Exists(output));
+        Assert.True(watch.Elapsed < TimeSpan.FromSeconds(10), $"Stopping took {watch.Elapsed.TotalSeconds:0.0} s.");
+        Assert.False(File.Exists(output), "The half-written video was not removed.");
     }
 }

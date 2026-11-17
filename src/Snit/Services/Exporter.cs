@@ -30,7 +30,6 @@ public sealed class Exporter
 
         var startInfo = new ProcessStartInfo(ffmpeg)
         {
-            RedirectStandardInput = true, // so we can send "q" to stop it
             RedirectStandardOutput = true,
             RedirectStandardError = true,
             UseShellExecute = false,
@@ -88,36 +87,17 @@ public sealed class Exporter
     }
 
     /// <summary>
-    /// Stops ffmpeg. First the polite way: typing "q" is ffmpeg's own "stop" key, and it also
-    /// reaches ffmpeg when it is started through a launcher (like Chocolatey's). If it hasn't
-    /// stopped after 3 seconds, we force it.
+    /// Stops ffmpeg straight away. (Asking it nicely makes it finish the frames it has
+    /// started first, which can take many seconds for 4K, and we throw the file away anyway.)
     /// </summary>
     private static async Task StopAsync(Process process)
     {
-        try
-        {
-            await process.StandardInput.WriteAsync("q");
-            await process.StandardInput.FlushAsync();
-        }
-        catch (IOException) { /* already gone */ }
-        catch (InvalidOperationException) { }
+        try { process.Kill(); } catch (Exception) { /* already gone */ }
+        // Also stop anything it started itself (for example when ffmpeg is a launcher program).
+        try { process.Kill(entireProcessTree: true); } catch (Exception) { }
 
-        using var grace = new CancellationTokenSource(TimeSpan.FromSeconds(3));
-        try
-        {
-            await process.WaitForExitAsync(grace.Token);
-            return;
-        }
-        catch (OperationCanceledException) { }
-
-        try { process.Kill(entireProcessTree: true); }
-        catch (Exception)
-        {
-            // Some part of the process tree couldn't be stopped; at least stop the main one.
-            try { process.Kill(); } catch (Exception) { /* already gone */ }
-        }
-        using var last = new CancellationTokenSource(TimeSpan.FromSeconds(5));
-        try { await process.WaitForExitAsync(last.Token); } catch (OperationCanceledException) { }
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        try { await process.WaitForExitAsync(timeout.Token); } catch (OperationCanceledException) { }
     }
 
     /// <summary>

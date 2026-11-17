@@ -1,0 +1,117 @@
+using System.IO;
+using System.Text.Json;
+using System.Text.Json.Serialization;
+using Snit.Core;
+
+namespace Snit.Services;
+
+/// <summary>
+/// Saves and opens .snit project files. A .snit file is plain JSON text, so you can open it
+/// in Notepad to see what's inside. It stores where the media files are, never the media itself.
+/// </summary>
+public static class ProjectFile
+{
+    public const string Extension = ".snit";
+    public const string DialogFilter = "Snit project (*.snit)|*.snit";
+    private const int CurrentVersion = 1;
+
+    private static readonly JsonSerializerOptions JsonOptions = new()
+    {
+        WriteIndented = true,
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        Converters = { new JsonStringEnumConverter() },
+    };
+
+    // ---- What the file looks like ----
+
+    private sealed record FileData(int Version, SettingsData Settings, List<MediaData> Media, List<TrackData> Tracks);
+    private sealed record SettingsData(int Width, int Height, double FrameRate);
+    private sealed record MediaData(Guid Id, string Path, string? RelativePath, MediaKind Kind,
+        double Duration, int Width, int Height, double FrameRate, bool HasAudio);
+    private sealed record TrackData(string Name, bool IsOff, bool IsLocked, List<ClipData> Clips);
+    private sealed record ClipData(Guid Id, Guid MediaId, long Start, long In, long Length, Guid? LinkId);
+
+    // ---- Save ----
+
+    public static void Save(Project project, string path)
+    {
+        string folder = Path.GetDirectoryName(Path.GetFullPath(path))!;
+
+        var data = new FileData(
+            CurrentVersion,
+            new SettingsData(project.Settings.Width, project.Settings.Height, project.Settings.FrameRate),
+            project.Media.Select(m => new MediaData(
+                m.Id, m.FilePath, Path.GetRelativePath(folder, m.FilePath), m.Kind,
+                m.DurationSeconds, m.Width, m.Height, m.FrameRate, m.HasAudio)).ToList(),
+            project.Tracks.Select(t => new TrackData(
+                t.Name, t.IsOff, t.IsLocked,
+                t.Clips.OrderBy(c => c.Start)
+                    .Select(c => new ClipData(c.Id, c.Media.Id, c.Start, c.In, c.Length, c.LinkId)).ToList())).ToList());
+
+        // Write to a temporary file first, so a crash halfway never leaves a broken project.
+        string temp = path + ".tmp";
+        File.WriteAllText(temp, JsonSerializer.Serialize(data, JsonOptions));
+        File.Move(temp, path, overwrite: true);
+        project.FilePath = path;
+    }
+
+    // ---- Open ----
+
+    public static Project Load(string path)
+    {
+        var data = JsonSerializer.Deserialize<FileData>(File.ReadAllText(path), JsonOptions)
+                   ?? throw new InvalidDataException("The project file is empty.");
+        if (data.Version > CurrentVersion)
+            throw new InvalidDataException("This project was made with a newer version of Snit.");
+
+        string folder = Path.GetDirectoryName(Path.GetFullPath(path))!;
+        var project = new Project
+        {
+            FilePath = path,
+            Settings = new ProjectSettings
+            {
+                Width = data.Settings.Width,
+                Height = data.Settings.Height,
+                FrameRate = data.Settings.FrameRate,
+            },
+        };
+
+        var mediaById = new Dictionary<Guid, MediaItem>();
+        foreach (var m in data.Media)
+        {
+            // Prefer the original path; if the project folder was moved, try the path relative to it.
+            string filePath = m.Path;
+            if (!File.Exists(filePath) && m.RelativePath is not null)
+            {
+                string relative = Path.GetFullPath(Path.Combine(folder, m.RelativePath));
+                if (File.Exists(relative)) filePath = relative;
+            }
+
+            var item = new MediaItem
+            {
+                Id = m.Id, FilePath = filePath, Kind = m.Kind, DurationSeconds = m.Duration,
+                Width = m.Width, Height = m.Height, FrameRate = m.FrameRate, HasAudio = m.HasAudio,
+                IsOffline = !File.Exists(filePath),
+            };
+            project.Media.Add(item);
+            mediaById[item.Id] = item;
+        }
+
+        foreach (var t in data.Tracks)
+        {
+            Track? track = project.Tracks.FirstOrDefault(x => x.Name == t.Name);
+            if (track is null) continue;
+            track.IsOff = t.IsOff;
+            track.IsLocked = t.IsLocked;
+            foreach (var c in t.Clips)
+            {
+                if (!mediaById.TryGetValue(c.MediaId, out var media)) continue;
+                track.Clips.Add(new Clip
+                {
+                    Id = c.Id, Media = media, Start = c.Start, In = c.In, Length = c.Length, LinkId = c.LinkId,
+                });
+            }
+        }
+        return project;
+    }
+}

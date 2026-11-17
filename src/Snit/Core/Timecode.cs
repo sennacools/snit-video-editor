@@ -10,10 +10,14 @@ public static class Timecode
     {
         if (seconds < 0) seconds = 0;
         if (framesPerSecond <= 0) framesPerSecond = 30;
+        return FromFrames((long)Math.Round(seconds * framesPerSecond), framesPerSecond);
+    }
 
-        // Work in whole frames so the numbers never drift.
-        long totalFrames = (long)Math.Round(seconds * framesPerSecond);
-        int fps = (int)Math.Round(framesPerSecond);
+    /// <summary>Same, for a frame number.</summary>
+    public static string FromFrames(long totalFrames, double framesPerSecond)
+    {
+        if (totalFrames < 0) totalFrames = 0;
+        int fps = Math.Max(1, (int)Math.Round(framesPerSecond));
 
         long frames = totalFrames % fps;
         long totalSeconds = totalFrames / fps;

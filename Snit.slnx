@@ -2,4 +2,7 @@
   <Folder Name="/src/">
     <Project Path="src/Snit/Snit.csproj" />
   </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Snit.Tests/Snit.Tests.csproj" />
+  </Folder>
 </Solution>

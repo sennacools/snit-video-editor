@@ -19,13 +19,13 @@
                     Padding="14,10">
                 <StackPanel>
                     <TextBlock Text="SELECTED CLIP" Style="{StaticResource MutedText}" FontWeight="SemiBold"/>
-                    <TextBlock Text="No clip selected" FontSize="14" FontWeight="SemiBold" Margin="0,4,0,0"
-                               Foreground="{StaticResource SecondaryTextBrush}"/>
+                    <TextBlock Text="{Binding Timeline.SelectedClipName}" FontSize="14" FontWeight="SemiBold" Margin="0,4,0,0"
+                               Foreground="{StaticResource SecondaryTextBrush}" TextTrimming="CharacterEllipsis"/>
                 </StackPanel>
             </Border>
 
             <ScrollViewer VerticalScrollBarVisibility="Auto">
-                <!-- Greyed out until a clip is selected (phase 2) and the effects exist (phases 4 and 5). -->
+                <!-- Greyed out until these effects exist (phases 4 and 5). -->
                 <StackPanel Margin="14,0,14,14" IsEnabled="False">
                     <TextBlock Text="TRANSFORM" Style="{StaticResource SectionTitle}"/>
                     <controls:PropertySlider Label="Scale" Minimum="0" Maximum="400" Value="100" Format="{}{0:0}%"/>

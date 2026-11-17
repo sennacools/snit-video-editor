@@ -12,7 +12,7 @@
                         <Run Text="Main sequence"/>
                     </TextBlock>
                     <TextBlock Style="{StaticResource MutedText}" HorizontalAlignment="Right"
-                               Text="Preview quality: Full · Fit"/>
+                               Text="{Binding PreviewQualityText}"/>
                 </Grid>
             </Border>
 
@@ -24,19 +24,35 @@
                     <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
 
-                <TextBlock Text="{Binding CurrentTimecode}" Style="{StaticResource TimecodeText}"
+                <TextBlock Text="{Binding Timeline.CurrentTimecode}" Style="{StaticResource TimecodeText}"
                            FontSize="16" Foreground="{StaticResource PlayheadBrush}"/>
 
-                <!-- Playback arrives in phase 2, so the buttons are greyed out for now. -->
-                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" IsEnabled="False">
-                    <Button Style="{StaticResource IconButton}" Content="&#xE892;" ToolTip="Go to start (Home)"/>
-                    <Button Style="{StaticResource IconButton}" Content="&#xE76B;" ToolTip="Previous frame (←)" Margin="4,0"/>
-                    <Button Style="{StaticResource PlayButton}" Content="&#xE768;" ToolTip="Play (Space)" Margin="8,0"/>
-                    <Button Style="{StaticResource IconButton}" Content="&#xE76C;" ToolTip="Next frame (→)" Margin="4,0"/>
-                    <Button Style="{StaticResource IconButton}" Content="&#xE893;" ToolTip="Go to end (End)"/>
+                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                    <Button Style="{StaticResource IconButton}" Content="&#xE892;" ToolTip="Go to start (Home)"
+                            Command="{Binding GoToStartCommand}"/>
+                    <Button Style="{StaticResource IconButton}" Content="&#xE76B;" ToolTip="Previous frame (←)" Margin="4,0"
+                            Command="{Binding StepBackCommand}"/>
+                    <Button Command="{Binding PlayPauseCommand}" Margin="8,0" Focusable="False">
+                        <Button.Style>
+                            <Style TargetType="Button" BasedOn="{StaticResource PlayButton}">
+                                <Setter Property="Content" Value="&#xE768;"/>
+                                <Setter Property="ToolTip" Value="Play (Space)"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsPlaying}" Value="True">
+                                        <Setter Property="Content" Value="&#xE769;"/>
+                                        <Setter Property="ToolTip" Value="Pause (Space)"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Button.Style>
+                    </Button>
+                    <Button Style="{StaticResource IconButton}" Content="&#xE76C;" ToolTip="Next frame (→)" Margin="4,0"
+                            Command="{Binding StepForwardCommand}"/>
+                    <Button Style="{StaticResource IconButton}" Content="&#xE893;" ToolTip="Go to end (End)"
+                            Command="{Binding GoToEndCommand}"/>
                 </StackPanel>
 
-                <TextBlock Grid.Column="2" Text="{Binding DurationTimecode}" Style="{StaticResource TimecodeText}"
+                <TextBlock Grid.Column="2" Text="{Binding Timeline.DurationTimecode}" Style="{StaticResource TimecodeText}"
                            Foreground="{StaticResource MutedTextBrush}" HorizontalAlignment="Right"/>
             </Grid>
 
@@ -46,6 +62,7 @@
             -->
             <Viewbox Margin="20,20,20,4" Stretch="Uniform">
                 <Grid Width="1920" Height="1080" Background="Black">
+                    <Image Source="{Binding PreviewImage}" Stretch="Fill" RenderOptions.BitmapScalingMode="Linear"/>
                     <Grid Visibility="{Binding ShowSafeGuides, Converter={StaticResource BoolToVisibility}}">
                         <!-- action-safe (5% in from each edge) and title-safe (10%) guides -->
                         <Rectangle Margin="96,54" Stroke="#38FFFFFF" StrokeThickness="3" StrokeDashArray="5 5"/>

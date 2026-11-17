@@ -13,6 +13,7 @@
             <!-- Small helpers used in bindings. -->
             <BooleanToVisibilityConverter x:Key="BoolToVisibility"/>
             <conv:EqualsConverter x:Key="EqualsConverter"/>
+            <conv:SixteenByNineConverter x:Key="SixteenByNine"/>
         </ResourceDictionary>
     </Application.Resources>
 </Application>

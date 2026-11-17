@@ -1,8 +1,68 @@
-﻿using System.Windows.Controls;
+﻿using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Input;
+using System.Windows.Media;
+using Snit.Controls;
+using Snit.Core;
+using Snit.ViewModels;
 
 namespace Snit.Views;
 
+/// <summary>
+/// Mouse handling for the media bin: dragging a tile to the timeline,
+/// and dropping files from Windows Explorer into the bin.
+/// </summary>
 public partial class MediaBinView : UserControl
 {
+    private Point? pressPoint;
+
     public MediaBinView() => InitializeComponent();
+
+    private MediaBinViewModel? Bin => (DataContext as MainViewModel)?.Bin;
+
+    private void MediaList_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        => pressPoint = e.GetPosition(MediaList);
+
+    private void MediaList_PreviewMouseMove(object sender, MouseEventArgs e)
+    {
+        if (e.LeftButton != MouseButtonState.Pressed || pressPoint is not Point start) return;
+
+        Point now = e.GetPosition(MediaList);
+        if (Math.Abs(now.X - start.X) < SystemParameters.MinimumHorizontalDragDistance &&
+            Math.Abs(now.Y - start.Y) < SystemParameters.MinimumVerticalDragDistance)
+            return;
+
+        // Which tile was pressed?
+        var element = MediaList.InputHitTest(start) as DependencyObject;
+        while (element is not null and not ListBoxItem) element = VisualTreeHelper.GetParent(element);
+        pressPoint = null;
+        if (element is ListBoxItem { DataContext: MediaItem item } && !item.IsOffline)
+        {
+            var data = new DataObject(TimelineCanvas.MediaDragFormat, item);
+            DragDrop.DoDragDrop(MediaList, data, DragDropEffects.Copy);
+        }
+    }
+
+    private void MediaList_KeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Delete && Bin?.SelectedItem is MediaItem item)
+        {
+            Bin.RemoveCommand.Execute(item);
+            e.Handled = true;
+        }
+    }
+
+    // ---- Files dropped from Explorer ----
+
+    private void MediaTab_DragOver(object sender, DragEventArgs e)
+    {
+        e.Effects = e.Data.GetDataPresent(DataFormats.FileDrop) ? DragDropEffects.Copy : DragDropEffects.None;
+        e.Handled = true;
+    }
+
+    private async void MediaTab_Drop(object sender, DragEventArgs e)
+    {
+        if (e.Data.GetData(DataFormats.FileDrop) is string[] files && Bin is { } bin)
+            await bin.ImportFilesAsync(files);
+    }
 }

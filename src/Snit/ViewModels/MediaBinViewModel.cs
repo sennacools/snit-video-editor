@@ -1,0 +1,146 @@
+using System.ComponentModel;
+using System.IO;
+using System.Windows;
+using System.Windows.Data;
+using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
+using Microsoft.Win32;
+using Snit.Core;
+using Snit.Services;
+
+namespace Snit.ViewModels;
+
+/// <summary>The media bin: the list of imported files, search, and importing.</summary>
+public partial class MediaBinViewModel : ObservableObject
+{
+    private readonly TimelineViewModel timeline;
+    private Project project = null!;
+
+    public MediaBinViewModel(Project project, TimelineViewModel timeline)
+    {
+        this.timeline = timeline;
+        Load(project);
+    }
+
+    /// <summary>The files shown in the bin (filtered by the search box).</summary>
+    public ICollectionView Items { get; private set; } = null!;
+
+    public bool IsEmpty => project.Media.Count == 0;
+
+    /// <summary>"Media", "Effects", "Transitions" or "Text".</summary>
+    [ObservableProperty]
+    private string activeTab = "Media";
+
+    [ObservableProperty]
+    private string searchText = "";
+
+    /// <summary>Shown while importing, e.g. "Importing 2 of 5…". Empty when idle.</summary>
+    [ObservableProperty]
+    private string importStatus = "";
+
+    [ObservableProperty]
+    private MediaItem? selectedItem;
+
+    partial void OnSearchTextChanged(string value) => Items.Refresh();
+
+    public void Load(Project newProject)
+    {
+        if (project is not null) project.Media.CollectionChanged -= OnMediaChanged;
+        project = newProject;
+        project.Media.CollectionChanged += OnMediaChanged;
+
+        Items = CollectionViewSource.GetDefaultView(project.Media);
+        Items.Filter = o => o is MediaItem m &&
+                            (string.IsNullOrWhiteSpace(SearchText) || m.Name.Contains(SearchText.Trim(), StringComparison.OrdinalIgnoreCase));
+        OnPropertyChanged(nameof(Items));
+        OnPropertyChanged(nameof(IsEmpty));
+
+        // Thumbnails aren't saved in the project file, so make them again.
+        foreach (var item in project.Media) _ = LoadThumbnailAsync(item);
+    }
+
+    private void OnMediaChanged(object? sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
+        => OnPropertyChanged(nameof(IsEmpty));
+
+    [RelayCommand]
+    private async Task ImportAsync()
+    {
+        var dialog = new OpenFileDialog
+        {
+            Title = "Import media",
+            Filter = MediaImporter.DialogFilter,
+            Multiselect = true,
+        };
+        if (dialog.ShowDialog() == true)
+            await ImportFilesAsync(dialog.FileNames);
+    }
+
+    /// <summary>Adds files to the bin (from the Import button or dropped from Explorer).</summary>
+    public async Task ImportFilesAsync(IReadOnlyList<string> paths)
+    {
+        if (!FFmpegLocator.Current.IsAvailable)
+        {
+            MessageBox.Show("Snit needs FFmpeg to import media.\n\nInstall it with:\n" + FFmpegLocator.InstallCommand,
+                "FFmpeg missing", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        var problems = new List<string>();
+        int done = 0;
+        foreach (string path in paths)
+        {
+            ImportStatus = $"Importing {++done} of {paths.Count}…";
+            if (project.Media.Any(m => string.Equals(m.FilePath, Path.GetFullPath(path), StringComparison.OrdinalIgnoreCase)))
+                continue; // already in the bin
+
+            try
+            {
+                MediaItem item = await MediaImporter.ProbeAsync(path);
+                project.Media.Add(item);
+                _ = LoadThumbnailAsync(item);
+            }
+            catch (Exception ex)
+            {
+                problems.Add($"{Path.GetFileName(path)}: {ex.Message}");
+            }
+        }
+        ImportStatus = "";
+
+        if (problems.Count > 0)
+            MessageBox.Show("These files couldn't be imported:\n\n" + string.Join("\n", problems),
+                "Import", MessageBoxButton.OK, MessageBoxImage.Warning);
+    }
+
+    private async Task LoadThumbnailAsync(MediaItem item)
+    {
+        try
+        {
+            item.Thumbnail = await MediaImporter.MakeThumbnailAsync(item);
+            timeline.RequestRedraw(); // the timeline shows thumbnails too
+        }
+        catch (Exception)
+        {
+            // No thumbnail is not a big deal; the bin shows a placeholder.
+        }
+    }
+
+    /// <summary>Removes a file from the bin (and its clips from the timeline, after asking).</summary>
+    [RelayCommand]
+    private void Remove(MediaItem? item)
+    {
+        item ??= SelectedItem;
+        if (item is null) return;
+
+        int uses = project.AllClips.Count(c => c.Media == item);
+        if (uses > 0)
+        {
+            var answer = MessageBox.Show(
+                $"\"{item.Name}\" is used {uses} time(s) on the timeline. Remove those clips too?",
+                "Remove media", MessageBoxButton.OKCancel, MessageBoxImage.Question);
+            if (answer != MessageBoxResult.OK) return;
+            timeline.RemoveClipsUsing(item);
+        }
+        project.Media.Remove(item);
+        timeline.NotifyContentChanged();
+    }
+}

@@ -56,7 +56,9 @@ public class ExportRunTests(TestMedia media) : IClassFixture<TestMedia>
         TimeSpan cancelledAt = TimeSpan.Zero;
         cancel.Token.Register(() => cancelledAt = watch.Elapsed);
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => new Exporter().RunAsync(plan, null, cancel.Token));
-        Assert.True(watch.Elapsed < TimeSpan.FromSeconds(10),
+        // What matters is how quickly it stops after you cancel. (On a busy computer the
+        // 1.5 s timer itself can go off late, so we don't count that part.)
+        Assert.True(watch.Elapsed - cancelledAt < TimeSpan.FromSeconds(5),
             $"Cancelled at {cancelledAt.TotalSeconds:0.0} s, stopped at {watch.Elapsed.TotalSeconds:0.0} s (ffmpeg: {FFmpegLocator.Current.FfmpegPath}).");
         int stillRunning = Process.GetProcessesByName("ffmpeg").Length;
         Assert.False(File.Exists(output), $"The half-written video was not removed ({stillRunning} ffmpeg process(es) still running).");

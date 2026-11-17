@@ -1,0 +1,48 @@
+<!-- Media bin (left panel): tabs, search, Import, and later a grid of thumbnails. -->
+<UserControl x:Class="Snit.Views.MediaBinView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Border Style="{StaticResource PanelBorder}">
+        <DockPanel>
+            <!-- Tabs -->
+            <Border DockPanel.Dock="Top" Style="{StaticResource PanelHeader}" Padding="6,0">
+                <StackPanel Orientation="Horizontal">
+                    <RadioButton Style="{StaticResource TabButton}" Content="Media"
+                                 IsChecked="{Binding MediaTab, Converter={StaticResource EqualsConverter}, ConverterParameter=Media}"/>
+                    <RadioButton Style="{StaticResource TabButton}" Content="Effects"
+                                 IsChecked="{Binding MediaTab, Converter={StaticResource EqualsConverter}, ConverterParameter=Effects}"/>
+                    <RadioButton Style="{StaticResource TabButton}" Content="Transitions"
+                                 IsChecked="{Binding MediaTab, Converter={StaticResource EqualsConverter}, ConverterParameter=Transitions}"/>
+                    <RadioButton Style="{StaticResource TabButton}" Content="Text"
+                                 IsChecked="{Binding MediaTab, Converter={StaticResource EqualsConverter}, ConverterParameter=Text}"/>
+                </StackPanel>
+            </Border>
+
+            <!-- Search + Import -->
+            <Grid DockPanel.Dock="Top" Margin="10,10,10,6">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <TextBox Tag="Search media" Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"/>
+                <Button Grid.Column="1" Margin="6,0,0,0" IsEnabled="False"
+                        ToolTipService.ShowOnDisabled="True" ToolTip="Importing is not built yet">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="&#xE710;" Style="{StaticResource IconText}" FontSize="11" Margin="0,0,6,0"/>
+                        <TextBlock Text="Import"/>
+                    </StackPanel>
+                </Button>
+            </Grid>
+
+            <!-- Empty state (the thumbnail grid replaces this once media can be imported) -->
+            <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Margin="24,0,24,40">
+                <TextBlock Text="&#xE714;" Style="{StaticResource IconText}" FontSize="28"
+                           Foreground="{StaticResource MutedTextBrush}"/>
+                <TextBlock Text="No media yet" FontSize="13" FontWeight="SemiBold"
+                           HorizontalAlignment="Center" Margin="0,12,0,4"/>
+                <TextBlock Text="Import video, audio or images, then drag them onto the timeline."
+                           Style="{StaticResource MutedText}" TextAlignment="Center" TextWrapping="Wrap"/>
+            </StackPanel>
+        </DockPanel>
+    </Border>
+</UserControl>

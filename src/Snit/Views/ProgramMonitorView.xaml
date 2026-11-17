@@ -1,0 +1,58 @@
+<!-- Program monitor (centre panel): the video preview with transport controls underneath. -->
+<UserControl x:Class="Snit.Views.ProgramMonitorView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Border Style="{StaticResource PanelBorder}" Background="{StaticResource MonitorBrush}">
+        <DockPanel>
+            <!-- Header -->
+            <Border DockPanel.Dock="Top" Style="{StaticResource PanelHeader}" Background="{StaticResource PanelBrush}">
+                <Grid>
+                    <TextBlock Style="{StaticResource PanelTitleText}">
+                        <Run Text="Program:" Foreground="{StaticResource MutedTextBrush}" FontWeight="Normal"/>
+                        <Run Text="Main sequence"/>
+                    </TextBlock>
+                    <TextBlock Style="{StaticResource MutedText}" HorizontalAlignment="Right"
+                               Text="Preview quality: Full · Fit"/>
+                </Grid>
+            </Border>
+
+            <!-- Transport bar -->
+            <Grid DockPanel.Dock="Bottom" Height="64" Margin="16,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <TextBlock Text="{Binding CurrentTimecode}" Style="{StaticResource TimecodeText}"
+                           FontSize="16" Foreground="{StaticResource PlayheadBrush}"/>
+
+                <!-- Playback arrives in phase 2, so the buttons are greyed out for now. -->
+                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" IsEnabled="False">
+                    <Button Style="{StaticResource IconButton}" Content="&#xE892;" ToolTip="Go to start (Home)"/>
+                    <Button Style="{StaticResource IconButton}" Content="&#xE76B;" ToolTip="Previous frame (←)" Margin="4,0"/>
+                    <Button Style="{StaticResource PlayButton}" Content="&#xE768;" ToolTip="Play (Space)" Margin="8,0"/>
+                    <Button Style="{StaticResource IconButton}" Content="&#xE76C;" ToolTip="Next frame (→)" Margin="4,0"/>
+                    <Button Style="{StaticResource IconButton}" Content="&#xE893;" ToolTip="Go to end (End)"/>
+                </StackPanel>
+
+                <TextBlock Grid.Column="2" Text="{Binding DurationTimecode}" Style="{StaticResource TimecodeText}"
+                           Foreground="{StaticResource MutedTextBrush}" HorizontalAlignment="Right"/>
+            </Grid>
+
+            <!--
+                The preview. Inside the Viewbox we work in real 1920×1080 pixels;
+                the Viewbox scales it down to fit and keeps the 16:9 shape.
+            -->
+            <Viewbox Margin="20,20,20,4" Stretch="Uniform">
+                <Grid Width="1920" Height="1080" Background="Black">
+                    <Grid Visibility="{Binding ShowSafeGuides, Converter={StaticResource BoolToVisibility}}">
+                        <!-- action-safe (5% in from each edge) and title-safe (10%) guides -->
+                        <Rectangle Margin="96,54" Stroke="#38FFFFFF" StrokeThickness="3" StrokeDashArray="5 5"/>
+                        <Rectangle Margin="192,108" Stroke="#38FFFFFF" StrokeThickness="3" StrokeDashArray="5 5"/>
+                    </Grid>
+                </Grid>
+            </Viewbox>
+        </DockPanel>
+    </Border>
+</UserControl>

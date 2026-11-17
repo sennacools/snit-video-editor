@@ -70,7 +70,7 @@ public sealed class Exporter
         catch (OperationCanceledException)
         {
             await StopAsync(process);
-            TryDelete(output); // don't leave a broken half-written video behind
+            await DeleteWhenReleasedAsync(output); // don't leave a broken half-written video behind
             throw;
         }
 
@@ -118,6 +118,19 @@ public sealed class Exporter
         }
         using var last = new CancellationTokenSource(TimeSpan.FromSeconds(5));
         try { await process.WaitForExitAsync(last.Token); } catch (OperationCanceledException) { }
+    }
+
+    /// <summary>
+    /// Windows can keep a file locked for a moment after the program writing it has stopped,
+    /// so keep trying for a few seconds.
+    /// </summary>
+    private static async Task DeleteWhenReleasedAsync(string path)
+    {
+        for (int attempt = 0; attempt < 30 && File.Exists(path); attempt++)
+        {
+            TryDelete(path);
+            if (File.Exists(path)) await Task.Delay(100);
+        }
     }
 
     private static void TryDelete(string path)

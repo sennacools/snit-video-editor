@@ -55,6 +55,7 @@ public class ExportRunTests(TestMedia media) : IClassFixture<TestMedia>
         var watch = Stopwatch.StartNew();
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => new Exporter().RunAsync(plan, null, cancel.Token));
         Assert.True(watch.Elapsed < TimeSpan.FromSeconds(10), $"Stopping took {watch.Elapsed.TotalSeconds:0.0} s.");
-        Assert.False(File.Exists(output), "The half-written video was not removed.");
+        int stillRunning = Process.GetProcessesByName("ffmpeg").Length;
+        Assert.False(File.Exists(output), $"The half-written video was not removed ({stillRunning} ffmpeg process(es) still running).");
     }
 }

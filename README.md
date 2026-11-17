@@ -8,7 +8,7 @@ It's built with C#, WPF and FFmpeg.
 ![Snit main window](docs/screenshot.png)
 
 > **Status:** work in progress. You can import media, edit on the timeline, preview with
-> sound, and save projects. Export, titles and effects are next.
+> sound, save projects and export to MP4. Titles, audio tools and effects are next.
 
 ## What works
 
@@ -19,6 +19,9 @@ It's built with C#, WPF and FFmpeg.
 - **Preview** with sound, frame-accurate scrubbing on the ruler, and frame-by-frame stepping
 - **Undo / redo** for every timeline edit
 - **Projects** saved as `.snit` files (plain JSON; media files are referenced, never copied)
+- **Export** to MP4 (H.264 video, AAC 320 kbps sound) at 720p, 1080p, 4K or vertical 1080×1920,
+  24–60 fps, with a quality slider, a progress bar with time left, and a Stop button.
+  Uses your NVIDIA, Intel or AMD graphics card when it can (needs an up-to-date driver).
 
 ## Keyboard shortcuts
 
@@ -33,6 +36,7 @@ It's built with C#, WPF and FFmpeg.
 | = / - | Zoom timeline in / out (Ctrl+mouse wheel also zooms) |
 | Ctrl+N / Ctrl+O / Ctrl+S | New / open / save project |
 | Ctrl+I | Import media |
+| Ctrl+M | Export |
 
 ## Requirements
 
@@ -77,6 +81,13 @@ The preview runs `ffmpeg` in the background and reads raw frames from it, alread
 960×540 and converted to the project frame rate. Playing or stepping forward keeps the same
 `ffmpeg` running, so it is fast; jumping somewhere else starts a new one at that exact frame.
 Sound is mixed by `ffmpeg` too and played with [NAudio](https://github.com/naudio/NAudio).
+
+## How export works
+
+Snit turns the timeline into a single `ffmpeg` command. Each clip becomes an input cut to the
+used part of its file. The pictures are resized to the export size and laid over a black
+background at the right times (V2 on top of V1), and all sound clips are delayed to their
+place and mixed. `ffmpeg` reports which frame it is on, which drives the progress bar.
 
 ## Tests
 

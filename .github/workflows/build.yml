@@ -18,8 +18,17 @@ jobs:
           dotnet-version: '10.0.x'
 
       # FFmpeg lets the media tests run too (they are skipped without it).
+      # We use the plain ffmpeg.exe (like winget installs), not Chocolatey's launcher,
+      # which starts ffmpeg as a separate program that can't be stopped the normal way.
       - name: Install FFmpeg
-        run: choco install ffmpeg --no-progress -y
+        shell: pwsh
+        run: |
+          $zip = "$env:RUNNER_TEMP\ffmpeg.zip"
+          Invoke-WebRequest "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip" -OutFile $zip
+          Expand-Archive $zip -DestinationPath "$env:RUNNER_TEMP\ffmpeg"
+          $bin = (Get-ChildItem "$env:RUNNER_TEMP\ffmpeg" -Recurse -Filter ffmpeg.exe | Select-Object -First 1).DirectoryName
+          Add-Content $env:GITHUB_PATH $bin
+          & "$bin\ffmpeg.exe" -hide_banner -version | Select-Object -First 1
 
       - name: Build
         run: dotnet build Snit.slnx --configuration Release

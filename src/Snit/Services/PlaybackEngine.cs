@@ -36,6 +36,7 @@ public sealed class PlaybackEngine : IDisposable
     private long seekRequest = -1;
     private long playRequest = -1;
     private volatile bool stopRequest;
+    private double playRate = 1;
 
     // A copy of the timeline for the player thread (replaced, never changed).
     private volatile IReadOnlyList<IReadOnlyList<VideoSegment>> layers = [];
@@ -99,8 +100,10 @@ public sealed class PlaybackEngine : IDisposable
         wake.Set();
     }
 
-    public void Play(long fromFrame)
+    /// <param name="rate">1 = normal, 2 = twice as fast (fast-forward plays without sound).</param>
+    public void Play(long fromFrame, double rate = 1)
     {
+        playRate = Math.Max(0.1, rate);
         stopRequest = false;
         Interlocked.Exchange(ref playRequest, Math.Max(0, fromFrame));
         wake.Set();
@@ -153,7 +156,8 @@ public sealed class PlaybackEngine : IDisposable
         if (from >= end) from = 0; // at the end: start again from the beginning
 
         Show(from);
-        using AudioPreview? audio = SafeStartAudio(from);
+        double rate = playRate;
+        using AudioPreview? audio = rate == 1 ? SafeStartAudio(from) : null; // fast-forward is silent
         if (audio is not null) audio.LevelsChanged += ReportLevels;
 
         IsPlaying = true;
@@ -173,7 +177,7 @@ public sealed class PlaybackEngine : IDisposable
             }
 
             double elapsed = Math.Max(0, clock.Elapsed.TotalSeconds - delay);
-            long frame = from + (long)(elapsed * fps);
+            long frame = from + (long)(elapsed * fps * rate);
 
             if (frame >= end)
             {
@@ -191,7 +195,7 @@ public sealed class PlaybackEngine : IDisposable
             }
 
             // Sleep until the next frame is due.
-            double nextDue = (lastFrame - from + 1) / fps + delay;
+            double nextDue = (lastFrame - from + 1) / (fps * rate) + delay;
             int sleepMs = (int)((nextDue - clock.Elapsed.TotalSeconds) * 1000);
             if (sleepMs > 0) wake.WaitOne(Math.Min(sleepMs, 15));
         }

@@ -46,6 +46,23 @@ public class TimeRuler : FrameworkElement
         nameof(PlayheadBrush), typeof(Brush), typeof(TimeRuler),
         new FrameworkPropertyMetadata(Brushes.OrangeRed, FrameworkPropertyMetadataOptions.AffectsRender));
 
+    /// <summary>In and out marks in seconds (NaN = not set). Drawn as a band with brackets.</summary>
+    public static readonly DependencyProperty InSecondsProperty = DependencyProperty.Register(
+        nameof(InSeconds), typeof(double), typeof(TimeRuler),
+        new FrameworkPropertyMetadata(double.NaN, FrameworkPropertyMetadataOptions.AffectsRender));
+
+    public static readonly DependencyProperty OutSecondsProperty = DependencyProperty.Register(
+        nameof(OutSeconds), typeof(double), typeof(TimeRuler),
+        new FrameworkPropertyMetadata(double.NaN, FrameworkPropertyMetadataOptions.AffectsRender));
+
+    public static readonly DependencyProperty RangeBrushProperty = DependencyProperty.Register(
+        nameof(RangeBrush), typeof(Brush), typeof(TimeRuler),
+        new FrameworkPropertyMetadata(Brushes.SteelBlue, FrameworkPropertyMetadataOptions.AffectsRender));
+
+    public double InSeconds { get => (double)GetValue(InSecondsProperty); set => SetValue(InSecondsProperty, value); }
+    public double OutSeconds { get => (double)GetValue(OutSecondsProperty); set => SetValue(OutSecondsProperty, value); }
+    public Brush RangeBrush { get => (Brush)GetValue(RangeBrushProperty); set => SetValue(RangeBrushProperty, value); }
+
     public double PixelsPerSecond { get => (double)GetValue(PixelsPerSecondProperty); set => SetValue(PixelsPerSecondProperty, value); }
     public double FramesPerSecond { get => (double)GetValue(FramesPerSecondProperty); set => SetValue(FramesPerSecondProperty, value); }
     public double ScrollX { get => (double)GetValue(ScrollXProperty); set => SetValue(ScrollXProperty, value); }
@@ -106,6 +123,8 @@ public class TimeRuler : FrameworkElement
         // Thin line along the bottom edge.
         dc.DrawLine(pen, new Point(0, height - 0.5), new Point(width, height - 0.5));
 
+        DrawInOut(dc, height, pps);
+
         // Playhead marker.
         double px = Math.Round(PlayheadSeconds * pps - ScrollX) + 0.5;
         if (px > -8 && px < width + 8)
@@ -114,6 +133,25 @@ public class TimeRuler : FrameworkElement
             dc.DrawGeometry(PlayheadBrush, null, Marker);
             dc.Pop();
         }
+    }
+
+    /// <summary>A light band between the in and out marks, with a bracket at each mark.</summary>
+    private void DrawInOut(DrawingContext dc, double height, double pps)
+    {
+        bool hasIn = !double.IsNaN(InSeconds), hasOut = !double.IsNaN(OutSeconds);
+        if (!hasIn && !hasOut) return;
+
+        double x1 = hasIn ? Math.Round(InSeconds * pps - ScrollX) : 0;
+        double x2 = hasOut ? Math.Round(OutSeconds * pps - ScrollX) : ActualWidth;
+        dc.PushOpacity(0.22);
+        dc.DrawRectangle(RangeBrush, null, new Rect(x1, 0, Math.Max(0, x2 - x1), height));
+        dc.Pop();
+
+        var pen = new Pen(RangeBrush, 2);
+        if (hasIn)  // [
+            dc.DrawGeometry(null, pen, Geometry.Parse(FormattableString.Invariant($"M{x1 + 5},1 L{x1 + 1},1 L{x1 + 1},{height - 1} L{x1 + 5},{height - 1}")));
+        if (hasOut) // ]
+            dc.DrawGeometry(null, pen, Geometry.Parse(FormattableString.Invariant($"M{x2 - 5},1 L{x2 - 1},1 L{x2 - 1},{height - 1} L{x2 - 5},{height - 1}")));
     }
 
     // ---- Scrubbing ----

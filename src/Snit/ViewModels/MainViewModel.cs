@@ -92,7 +92,11 @@ public partial class MainViewModel : ObservableObject, IDisposable
             positionFromPlayer = false;
             Timeline.KeepPlayheadVisible();
         };
-        engine.Stopped += () => IsPlaying = false;
+        engine.Stopped += () =>
+        {
+            IsPlaying = false;
+            if (shuttleSpeed > 0) shuttleSpeed = 0;
+        };
         engine.LevelsChanged += (left, right) =>
         {
             LevelLeft = left;
@@ -148,13 +152,14 @@ public partial class MainViewModel : ObservableObject, IDisposable
         if (positionFromPlayer) return;
 
         // You moved the playhead (ruler, arrow keys...): show that frame, or keep playing from there.
-        if (IsPlaying) playback.Play(Timeline.PlayheadFrame);
+        if (IsPlaying) playback.Play(Timeline.PlayheadFrame, Math.Max(1, shuttleSpeed));
         else playback.Seek(Timeline.PlayheadFrame);
     }
 
     [RelayCommand]
     private void PlayPause()
     {
+        StopShuttle();
         if (IsPlaying)
         {
             playback.Stop();
@@ -167,6 +172,66 @@ public partial class MainViewModel : ObservableObject, IDisposable
             IsPlaying = true;
             playback.Play(Timeline.PlayheadFrame);
         }
+    }
+
+    // ---- Shuttle: J (backwards), K (stop), L (forwards); pressing again goes faster ----
+
+    private int shuttleSpeed; // 0 = off; 1, 2, 4 = forwards; -1, -2, -4 = backwards
+    private System.Windows.Threading.DispatcherTimer? backwardsTimer;
+
+    public void ShuttleForward() => StartShuttle(shuttleSpeed <= 0 ? 1 : Math.Min(4, shuttleSpeed * 2));
+
+    public void ShuttleBackward() => StartShuttle(shuttleSpeed >= 0 ? -1 : Math.Max(-4, shuttleSpeed * 2));
+
+    public void ShuttleStop()
+    {
+        StopShuttle();
+        if (IsPlaying)
+        {
+            playback.Stop();
+            IsPlaying = false;
+        }
+    }
+
+    private void StartShuttle(int speed)
+    {
+        if (Timeline.DurationFrames == 0) return;
+        StopShuttle();
+        shuttleSpeed = speed;
+
+        if (speed > 0)
+        {
+            // Forwards: the player plays faster (without sound above normal speed).
+            if (Timeline.PlayheadFrame >= Timeline.DurationFrames) Timeline.PlayheadFrame = 0;
+            IsPlaying = true;
+            playback.Play(Timeline.PlayheadFrame, speed);
+            return;
+        }
+
+        // Backwards: the player can only read forwards, so we move the playhead back step by
+        // step and show each frame (a bit choppy, like reversed clips).
+        if (IsPlaying)
+        {
+            playback.Stop();
+            IsPlaying = false;
+        }
+        long startFrame = Timeline.PlayheadFrame;
+        var clock = System.Diagnostics.Stopwatch.StartNew();
+        backwardsTimer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromSeconds(1 / project.Fps) };
+        backwardsTimer.Tick += (_, _) =>
+        {
+            long frame = startFrame - (long)(clock.Elapsed.TotalSeconds * project.Fps * -shuttleSpeed);
+            Timeline.PlayheadFrame = Math.Max(0, frame);
+            if (frame <= 0) StopShuttle();
+        };
+        backwardsTimer.Start();
+    }
+
+    private void StopShuttle()
+    {
+        shuttleSpeed = 0;
+        backwardsTimer?.Stop();
+        backwardsTimer = null;
     }
 
     [RelayCommand]

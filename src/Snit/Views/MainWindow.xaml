@@ -81,8 +81,14 @@
                         <MenuItem Header="Play / pause" InputGestureText="Space" Command="{Binding PlayPauseCommand}"/>
                         <MenuItem Header="Go to start" InputGestureText="Home" Command="{Binding GoToStartCommand}"/>
                         <MenuItem Header="Go to end" InputGestureText="End" Command="{Binding GoToEndCommand}"/>
+                        <MenuItem Header="Previous cut" InputGestureText="↑" Click="PreviousEdit_Click"/>
+                        <MenuItem Header="Next cut" InputGestureText="↓" Click="NextEdit_Click"/>
                         <Separator/>
-                        <MenuItem Header="Snapping" IsCheckable="True" IsChecked="{Binding Timeline.SnappingEnabled}"/>
+                        <MenuItem Header="Mark in" InputGestureText="I" Click="MarkIn_Click"/>
+                        <MenuItem Header="Mark out" InputGestureText="O" Click="MarkOut_Click"/>
+                        <MenuItem Header="Clear in and out" InputGestureText="Ctrl+Shift+X" Click="ClearInOut_Click"/>
+                        <Separator/>
+                        <MenuItem Header="Snapping" IsCheckable="True" InputGestureText="S" IsChecked="{Binding Timeline.SnappingEnabled}"/>
                         <Separator/>
                         <MenuItem Header="Zoom in" InputGestureText="=" Command="{Binding Timeline.ZoomInCommand}"/>
                         <MenuItem Header="Zoom out" InputGestureText="-" Command="{Binding Timeline.ZoomOutCommand}"/>

@@ -79,6 +79,33 @@ public partial class MainWindow : Window
         bool shift = Keyboard.Modifiers.HasFlag(ModifierKeys.Shift);
         TimelineViewModel tl = viewModel.Timeline;
 
+        // Single keys without Ctrl: tools and the shuttle (J = back, K = stop, L = forward, faster each press).
+        Action? action = (e.Key, ctrl, shift) switch
+        {
+            (Key.V, false, false) => () => tl.ActiveTool = "Select",
+            (Key.C, false, false) => () => tl.ActiveTool = "Razor",
+            (Key.B, false, false) => () => tl.ActiveTool = "Ripple",
+            (Key.T, false, false) => () => tl.ActiveTool = "Text",
+            (Key.H, false, false) => () => tl.ActiveTool = "Hand",
+            (Key.Z, false, false) => () => tl.ActiveTool = "Zoom",
+            (Key.S, false, false) => () => tl.SnappingEnabled = !tl.SnappingEnabled,
+            (Key.J, false, false) => viewModel.ShuttleBackward,
+            (Key.K, false, false) => viewModel.ShuttleStop,
+            (Key.L, false, false) => viewModel.ShuttleForward,
+            (Key.Up, false, false) => tl.GoToPreviousEdit,
+            (Key.Down, false, false) => tl.GoToNextEdit,
+            (Key.I, false, false) => tl.SetInPoint,
+            (Key.O, false, false) => tl.SetOutPoint,
+            (Key.X, true, true) => tl.ClearInOut,
+            _ => null,
+        };
+        if (action is not null)
+        {
+            action();
+            e.Handled = true;
+            return;
+        }
+
         ICommand? command = (e.Key, ctrl, shift) switch
         {
             (Key.Space, false, _) => viewModel.PlayPauseCommand,
@@ -108,6 +135,13 @@ public partial class MainWindow : Window
         if (command.CanExecute(null)) command.Execute(null);
         e.Handled = true;
     }
+
+    // Menu items that call the same actions as their keys.
+    private void PreviousEdit_Click(object sender, RoutedEventArgs e) => viewModel.Timeline.GoToPreviousEdit();
+    private void NextEdit_Click(object sender, RoutedEventArgs e) => viewModel.Timeline.GoToNextEdit();
+    private void MarkIn_Click(object sender, RoutedEventArgs e) => viewModel.Timeline.SetInPoint();
+    private void MarkOut_Click(object sender, RoutedEventArgs e) => viewModel.Timeline.SetOutPoint();
+    private void ClearInOut_Click(object sender, RoutedEventArgs e) => viewModel.Timeline.ClearInOut();
 
     private void Minimize_Click(object sender, RoutedEventArgs e) => WindowState = WindowState.Minimized;
 

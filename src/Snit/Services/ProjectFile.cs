@@ -24,7 +24,8 @@ public static class ProjectFile
 
     // ---- What the file looks like ----
 
-    private sealed record FileData(int Version, SettingsData Settings, List<MediaData> Media, List<TrackData> Tracks);
+    private sealed record FileData(int Version, SettingsData Settings, List<MediaData> Media, List<TrackData> Tracks,
+        long? InPoint = null, long? OutPoint = null);
     private sealed record SettingsData(int Width, int Height, double FrameRate);
     private sealed record MediaData(Guid Id, string Path, string? RelativePath, MediaKind Kind,
         double Duration, int Width, int Height, double FrameRate, bool HasAudio);
@@ -86,7 +87,8 @@ public static class ProjectFile
                             Text = t.Text, FontFamily = t.FontFamily, FontSize = t.FontSize, Color = t.Color,
                             Bold = t.Bold, Shadow = t.Shadow, X = t.X, Y = t.Y,
                         } : null,
-                    }).ToList())).ToList());
+                    }).ToList())).ToList(),
+            project.InPoint, project.OutPoint);
 
         // Write to a temporary file first, so a crash halfway never leaves a broken project.
         string temp = path + ".tmp";
@@ -115,6 +117,9 @@ public static class ProjectFile
                 FrameRate = data.Settings.FrameRate,
             },
         };
+
+        project.InPoint = data.InPoint;
+        project.OutPoint = data.OutPoint;
 
         var mediaById = new Dictionary<Guid, MediaItem>();
         foreach (var m in data.Media)

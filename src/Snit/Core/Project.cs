@@ -246,6 +246,10 @@ public sealed class Project
         new Track { Name = "A2", Kind = TrackKind.Audio },
     ];
 
+    /// <summary>The "in" and "out" marks (I and O keys): a part of the timeline, e.g. to export only that.</summary>
+    public long? InPoint { get; set; }
+    public long? OutPoint { get; set; }
+
     /// <summary>Where the project is saved, or null if it never was.</summary>
     public string? FilePath { get; set; }
 

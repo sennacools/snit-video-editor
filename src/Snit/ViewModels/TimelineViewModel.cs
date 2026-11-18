@@ -70,6 +70,64 @@ public partial class TimelineViewModel : ObservableObject
 
     partial void OnPlayheadFrameChanged(long value) => RedrawNeeded?.Invoke();
 
+    // ===================== Jumping between cuts =====================
+
+    /// <summary>Every place where a clip starts or ends, plus 0.</summary>
+    private IEnumerable<long> EditPoints => Project.AllClips.SelectMany(c => new[] { c.Start, c.End }).Append(0).Distinct();
+
+    /// <summary>Up arrow: to the previous cut.</summary>
+    public void GoToPreviousEdit()
+        => PlayheadFrame = EditPoints.Where(f => f < PlayheadFrame).DefaultIfEmpty(0).Max();
+
+    /// <summary>Down arrow: to the next cut.</summary>
+    public void GoToNextEdit()
+        => PlayheadFrame = EditPoints.Where(f => f > PlayheadFrame).DefaultIfEmpty(PlayheadFrame).Min();
+
+    // ===================== In and out points =====================
+
+    public long? InPoint => Project.InPoint;
+    public long? OutPoint => Project.OutPoint;
+
+    /// <summary>True when both marks are set and the out mark is after the in mark.</summary>
+    public bool HasInOutRange => InPoint is long i && OutPoint is long o && o > i;
+
+    /// <summary>For the ruler: the marks in seconds, or NaN when not set.</summary>
+    public double InSeconds => InPoint is long i ? i / Fps : double.NaN;
+    public double OutSeconds => OutPoint is long o ? o / Fps : double.NaN;
+
+    /// <summary>I key: put the in mark at the playhead (the out mark moves along if it was before it).</summary>
+    public void SetInPoint()
+    {
+        Project.InPoint = PlayheadFrame;
+        if (Project.OutPoint <= PlayheadFrame) Project.OutPoint = null;
+        InOutChanged();
+    }
+
+    /// <summary>O key: put the out mark at the playhead.</summary>
+    public void SetOutPoint()
+    {
+        Project.OutPoint = PlayheadFrame;
+        if (Project.InPoint >= PlayheadFrame) Project.InPoint = null;
+        InOutChanged();
+    }
+
+    /// <summary>Ctrl+Shift+X: remove both marks.</summary>
+    public void ClearInOut()
+    {
+        Project.InPoint = Project.OutPoint = null;
+        InOutChanged();
+    }
+
+    private void InOutChanged()
+    {
+        OnPropertyChanged(nameof(InPoint));
+        OnPropertyChanged(nameof(OutPoint));
+        OnPropertyChanged(nameof(HasInOutRange));
+        OnPropertyChanged(nameof(InSeconds));
+        OnPropertyChanged(nameof(OutSeconds));
+        NotifyContentChanged(); // saved with the project
+    }
+
     // ===================== Zoom and scrolling =====================
 
     public const double MinPixelsPerSecond = 2;

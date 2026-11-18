@@ -1,109 +1,197 @@
-<!-- Program monitor (centre panel): the video preview with transport controls underneath. -->
+<!--
+    The monitor (centre panel), with two tabs:
+    - Program: the timeline's picture, with transport controls underneath.
+    - Source: one file from the bin (double-click it), to mark in/out and Insert or Overwrite.
+-->
 <UserControl x:Class="Snit.Views.ProgramMonitorView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:controls="clr-namespace:Snit.Controls">
+    <UserControl.Resources>
+        <!-- One layer of a monitor picture: centred, then sized, turned and moved around its middle.
+             The black rectangle darkens it for "dip to black"; the opacity mask keeps that to the
+             picture's own (solid) pixels. -->
+        <DataTemplate x:Key="LayerTemplate">
+            <Grid Width="{Binding Width}" Height="{Binding Height}" Opacity="{Binding Opacity}"
+                  HorizontalAlignment="Center" VerticalAlignment="Center"
+                  RenderTransformOrigin="0.5,0.5"
+                  Visibility="{Binding IsVisible, Converter={StaticResource BoolToVisibility}}">
+                <Grid.RenderTransform>
+                    <TransformGroup>
+                        <ScaleTransform ScaleX="{Binding Scale}" ScaleY="{Binding Scale}"/>
+                        <RotateTransform Angle="{Binding Rotation}"/>
+                        <TranslateTransform X="{Binding OffsetX}" Y="{Binding OffsetY}"/>
+                    </TransformGroup>
+                </Grid.RenderTransform>
+                <Grid.OpacityMask>
+                    <ImageBrush ImageSource="{Binding Source}"/>
+                </Grid.OpacityMask>
+                <Image Source="{Binding Source}" Stretch="Fill" RenderOptions.BitmapScalingMode="Linear"/>
+                <Rectangle Fill="Black" Opacity="{Binding Darken}"/>
+            </Grid>
+        </DataTemplate>
+
+        <ItemsPanelTemplate x:Key="StackedLayers">
+            <Grid/>
+        </ItemsPanelTemplate>
+
+        <!-- Shows a panel only when the monitor is on that tab. -->
+        <Style x:Key="ProgramOnly" TargetType="FrameworkElement">
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding MonitorTab}" Value="Source">
+                    <Setter Property="Visibility" Value="Collapsed"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+        <Style x:Key="SourceOnly" TargetType="FrameworkElement">
+            <Setter Property="Visibility" Value="Collapsed"/>
+            <Style.Triggers>
+                <!-- This panel's own DataContext is the Source monitor, so ask the whole monitor which tab is on. -->
+                <DataTrigger Binding="{Binding DataContext.MonitorTab, RelativeSource={RelativeSource AncestorType=UserControl}}" Value="Source">
+                    <Setter Property="Visibility" Value="Visible"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="PlayPauseButton" TargetType="Button" BasedOn="{StaticResource PlayButton}">
+            <Setter Property="Content" Value="&#xE768;"/>
+            <Setter Property="ToolTip" Value="Play (Space)"/>
+            <Setter Property="Focusable" Value="False"/>
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsPlaying}" Value="True">
+                    <Setter Property="Content" Value="&#xE769;"/>
+                    <Setter Property="ToolTip" Value="Pause (Space)"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+    </UserControl.Resources>
+
     <Border Style="{StaticResource PanelBorder}" Background="{StaticResource MonitorBrush}">
         <DockPanel>
-            <!-- Header -->
-            <Border DockPanel.Dock="Top" Style="{StaticResource PanelHeader}" Background="{StaticResource PanelBrush}">
-                <Grid>
-                    <TextBlock Style="{StaticResource PanelTitleText}">
-                        <Run Text="Program:" Foreground="{StaticResource MutedTextBrush}" FontWeight="Normal"/>
-                        <Run Text="Main sequence"/>
-                    </TextBlock>
-                    <TextBlock Style="{StaticResource MutedText}" HorizontalAlignment="Right"
-                               Text="{Binding PreviewQualityText}"/>
-                </Grid>
+            <!-- Header with the two tabs -->
+            <Border DockPanel.Dock="Top" Style="{StaticResource PanelHeader}" Background="{StaticResource PanelBrush}" Padding="6,0,12,0">
+                <DockPanel>
+                    <StackPanel Orientation="Horizontal">
+                        <RadioButton Style="{StaticResource TabButton}"
+                                     IsChecked="{Binding MonitorTab, Converter={StaticResource EqualsConverter}, ConverterParameter=Source}">
+                            <TextBlock>
+                                <Run Text="Source:" Foreground="{StaticResource MutedTextBrush}"/>
+                                <Run Text="{Binding Source.Title, Mode=OneWay}"/>
+                            </TextBlock>
+                        </RadioButton>
+                        <RadioButton Style="{StaticResource TabButton}"
+                                     IsChecked="{Binding MonitorTab, Converter={StaticResource EqualsConverter}, ConverterParameter=Program}">
+                            <TextBlock>
+                                <Run Text="Program:" Foreground="{StaticResource MutedTextBrush}"/>
+                                <Run Text="Main sequence"/>
+                            </TextBlock>
+                        </RadioButton>
+                    </StackPanel>
+                    <TextBlock Style="{StaticResource MutedText}" HorizontalAlignment="Right" Text="{Binding PreviewQualityText}"/>
+                </DockPanel>
             </Border>
 
-            <!-- Transport bar -->
-            <Grid DockPanel.Dock="Bottom" Height="64" Margin="16,0">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="*"/>
-                </Grid.ColumnDefinitions>
+            <Grid>
+                <!-- ===================== Program ===================== -->
+                <DockPanel Style="{StaticResource ProgramOnly}">
+                    <Grid DockPanel.Dock="Bottom" Height="64" Margin="16,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="{Binding Timeline.CurrentTimecode}" Style="{StaticResource TimecodeText}"
+                                   FontSize="16" Foreground="{StaticResource PlayheadBrush}"/>
+                        <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                            <Button Style="{StaticResource IconButton}" Content="&#xE892;" ToolTip="Go to start (Home)"
+                                    Command="{Binding GoToStartCommand}"/>
+                            <Button Style="{StaticResource IconButton}" Content="&#xE76B;" ToolTip="Previous frame (←)" Margin="4,0"
+                                    Command="{Binding StepBackCommand}"/>
+                            <Button Style="{StaticResource PlayPauseButton}" Command="{Binding PlayPauseCommand}" Margin="8,0"/>
+                            <Button Style="{StaticResource IconButton}" Content="&#xE76C;" ToolTip="Next frame (→)" Margin="4,0"
+                                    Command="{Binding StepForwardCommand}"/>
+                            <Button Style="{StaticResource IconButton}" Content="&#xE893;" ToolTip="Go to end (End)"
+                                    Command="{Binding GoToEndCommand}"/>
+                        </StackPanel>
+                        <TextBlock Grid.Column="2" Text="{Binding Timeline.DurationTimecode}" Style="{StaticResource TimecodeText}"
+                                   Foreground="{StaticResource MutedTextBrush}" HorizontalAlignment="Right"/>
+                    </Grid>
 
-                <TextBlock Text="{Binding Timeline.CurrentTimecode}" Style="{StaticResource TimecodeText}"
-                           FontSize="16" Foreground="{StaticResource PlayheadBrush}"/>
+                    <!-- Inside the Viewbox we work in real project pixels (1920×1080); it scales down to fit. -->
+                    <Viewbox Margin="20,20,20,4" Stretch="Uniform">
+                        <Grid Width="{Binding FrameWidth}" Height="{Binding FrameHeight}">
+                            <!-- One layer per video track, V1 at the bottom. ClipToBounds cuts off anything
+                                 moved or scaled past the frame edge, like the export does. -->
+                            <Grid x:Name="Picture" Background="Black" ClipToBounds="True">
+                                <ItemsControl ItemsSource="{Binding PreviewLayers}" IsHitTestVisible="False"
+                                              ItemsPanel="{StaticResource StackedLayers}" ItemTemplate="{StaticResource LayerTemplate}"/>
+                            </Grid>
+                            <Grid Visibility="{Binding ShowSafeGuides, Converter={StaticResource BoolToVisibility}}">
+                                <!-- action-safe (5% in from each edge) and title-safe (10%) guides -->
+                                <Rectangle Margin="96,54" Stroke="#38FFFFFF" StrokeThickness="3" StrokeDashArray="5 5"/>
+                                <Rectangle Margin="192,108" Stroke="#38FFFFFF" StrokeThickness="3" StrokeDashArray="5 5"/>
+                            </Grid>
+                        </Grid>
+                    </Viewbox>
+                </DockPanel>
 
-                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                    <Button Style="{StaticResource IconButton}" Content="&#xE892;" ToolTip="Go to start (Home)"
-                            Command="{Binding GoToStartCommand}"/>
-                    <Button Style="{StaticResource IconButton}" Content="&#xE76B;" ToolTip="Previous frame (←)" Margin="4,0"
-                            Command="{Binding StepBackCommand}"/>
-                    <Button Command="{Binding PlayPauseCommand}" Margin="8,0" Focusable="False">
-                        <Button.Style>
-                            <Style TargetType="Button" BasedOn="{StaticResource PlayButton}">
-                                <Setter Property="Content" Value="&#xE768;"/>
-                                <Setter Property="ToolTip" Value="Play (Space)"/>
-                                <Style.Triggers>
-                                    <DataTrigger Binding="{Binding IsPlaying}" Value="True">
-                                        <Setter Property="Content" Value="&#xE769;"/>
-                                        <Setter Property="ToolTip" Value="Pause (Space)"/>
-                                    </DataTrigger>
-                                </Style.Triggers>
-                            </Style>
-                        </Button.Style>
-                    </Button>
-                    <Button Style="{StaticResource IconButton}" Content="&#xE76C;" ToolTip="Next frame (→)" Margin="4,0"
-                            Command="{Binding StepForwardCommand}"/>
-                    <Button Style="{StaticResource IconButton}" Content="&#xE893;" ToolTip="Go to end (End)"
-                            Command="{Binding GoToEndCommand}"/>
-                </StackPanel>
+                <!-- ===================== Source ===================== -->
+                <DockPanel Style="{StaticResource SourceOnly}" DataContext="{Binding Source}">
+                    <!-- Insert / Overwrite and the in/out buttons -->
+                    <Grid DockPanel.Dock="Bottom" Height="64" Margin="16,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="{Binding CurrentTimecode}" Style="{StaticResource TimecodeText}"
+                                   FontSize="16" Foreground="{StaticResource PlayheadBrush}"/>
+                        <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" IsEnabled="{Binding HasMedia}">
+                            <Button Style="{StaticResource IconButton}" Content="{}{" FontFamily="{StaticResource MonoFont}" FontSize="15"
+                                    ToolTip="Mark in (I)" Command="{Binding MarkInCommand}"/>
+                            <Button Style="{StaticResource IconButton}" Content="&#xE76B;" ToolTip="Previous frame (←)" Margin="4,0"
+                                    Command="{Binding StepBackCommand}"/>
+                            <Button Style="{StaticResource PlayPauseButton}" Command="{Binding PlayPauseCommand}" Margin="8,0"/>
+                            <Button Style="{StaticResource IconButton}" Content="&#xE76C;" ToolTip="Next frame (→)" Margin="4,0"
+                                    Command="{Binding StepForwardCommand}"/>
+                            <Button Style="{StaticResource IconButton}" Content="}" FontFamily="{StaticResource MonoFont}" FontSize="15"
+                                    ToolTip="Mark out (O)" Command="{Binding MarkOutCommand}"/>
+                            <Button Content="Insert" Margin="16,0,6,0" Command="{Binding InsertCommand}"
+                                    ToolTip="Put the marked part at the playhead and push the rest of the timeline right (,)"/>
+                            <Button Content="Overwrite" Command="{Binding OverwriteCommand}"
+                                    ToolTip="Put the marked part at the playhead on top of what's there (.)"/>
+                        </StackPanel>
+                        <TextBlock Grid.Column="2" Style="{StaticResource TimecodeText}" Foreground="{StaticResource MutedTextBrush}"
+                                   HorizontalAlignment="Right">
+                            <Run Text="marked"/>
+                            <Run Text="{Binding MarkedTimecode, Mode=OneWay}"/>
+                        </TextBlock>
+                    </Grid>
 
-                <TextBlock Grid.Column="2" Text="{Binding Timeline.DurationTimecode}" Style="{StaticResource TimecodeText}"
-                           Foreground="{StaticResource MutedTextBrush}" HorizontalAlignment="Right"/>
+                    <!-- Scrub bar with the in/out band -->
+                    <controls:TimeRuler DockPanel.Dock="Bottom" Height="26" Margin="20,0"
+                                        PixelsPerSecond="{Binding ScrubPixelsPerSecond}"
+                                        FramesPerSecond="{Binding SourceFps, Mode=OneWay}" ScrollX="0"
+                                        PlayheadSeconds="{Binding PlayheadSeconds}"
+                                        InSeconds="{Binding InSeconds, Mode=OneWay}" OutSeconds="{Binding OutSeconds, Mode=OneWay}"
+                                        RangeBrush="{StaticResource AccentBrush}" Background="{StaticResource PanelBrush}"
+                                        TickBrush="{StaticResource BorderBrush}" TextBrush="{StaticResource MutedTextBrush}"
+                                        PlayheadBrush="{StaticResource PlayheadBrush}" SizeChanged="SourceRuler_SizeChanged"
+                                        x:Name="SourceRuler"/>
+
+                    <Viewbox Margin="20,20,20,6" Stretch="Uniform">
+                        <Grid Width="{Binding DataContext.FrameWidth, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                              Height="{Binding DataContext.FrameHeight, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                              Background="Black" ClipToBounds="True">
+                            <ItemsControl ItemsSource="{Binding Layers}" IsHitTestVisible="False"
+                                          ItemsPanel="{StaticResource StackedLayers}" ItemTemplate="{StaticResource LayerTemplate}"/>
+                            <TextBlock Text="Double-click a file in the media bin to watch it here" FontSize="44"
+                                       Foreground="{StaticResource MutedTextBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                       Visibility="{Binding HasMedia, Converter={StaticResource InverseBoolToVisibility}}"/>
+                        </Grid>
+                    </Viewbox>
+                </DockPanel>
             </Grid>
-
-            <!--
-                The preview. Inside the Viewbox we work in real project pixels (1920×1080);
-                the Viewbox scales it down to fit and keeps the shape.
-            -->
-            <Viewbox Margin="20,20,20,4" Stretch="Uniform">
-                <Grid Width="{Binding FrameWidth}" Height="{Binding FrameHeight}">
-                    <!-- The picture: one layer per video track, V1 at the bottom. ClipToBounds cuts off
-                         anything moved or scaled past the frame edge, like the export does. -->
-                    <Grid x:Name="Picture" Background="Black" ClipToBounds="True">
-                        <ItemsControl ItemsSource="{Binding PreviewLayers}" IsHitTestVisible="False">
-                            <ItemsControl.ItemsPanel>
-                                <ItemsPanelTemplate>
-                                    <Grid/>
-                                </ItemsPanelTemplate>
-                            </ItemsControl.ItemsPanel>
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate>
-                                    <!-- Centred, then sized, turned and moved around its middle. The black
-                                         rectangle on top darkens the picture for "dip to black"; the
-                                         opacity mask keeps it to the picture's own (solid) pixels. -->
-                                    <Grid Width="{Binding Width}" Height="{Binding Height}" Opacity="{Binding Opacity}"
-                                          HorizontalAlignment="Center" VerticalAlignment="Center"
-                                          RenderTransformOrigin="0.5,0.5"
-                                          Visibility="{Binding IsVisible, Converter={StaticResource BoolToVisibility}}">
-                                        <Grid.RenderTransform>
-                                            <TransformGroup>
-                                                <ScaleTransform ScaleX="{Binding Scale}" ScaleY="{Binding Scale}"/>
-                                                <RotateTransform Angle="{Binding Rotation}"/>
-                                                <TranslateTransform X="{Binding OffsetX}" Y="{Binding OffsetY}"/>
-                                            </TransformGroup>
-                                        </Grid.RenderTransform>
-                                        <Grid.OpacityMask>
-                                            <ImageBrush ImageSource="{Binding Source}"/>
-                                        </Grid.OpacityMask>
-                                        <Image Source="{Binding Source}" Stretch="Fill" RenderOptions.BitmapScalingMode="Linear"/>
-                                        <Rectangle Fill="Black" Opacity="{Binding Darken}"/>
-                                    </Grid>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                    </Grid>
-                    <Grid Visibility="{Binding ShowSafeGuides, Converter={StaticResource BoolToVisibility}}">
-                        <!-- action-safe (5% in from each edge) and title-safe (10%) guides -->
-                        <Rectangle Margin="96,54" Stroke="#38FFFFFF" StrokeThickness="3" StrokeDashArray="5 5"/>
-                        <Rectangle Margin="192,108" Stroke="#38FFFFFF" StrokeThickness="3" StrokeDashArray="5 5"/>
-                    </Grid>
-                </Grid>
-            </Viewbox>
         </DockPanel>
     </Border>
 </UserControl>

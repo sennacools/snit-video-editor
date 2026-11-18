@@ -43,6 +43,13 @@ public partial class MediaBinView : UserControl
         }
     }
 
+    /// <summary>Double-click a tile: watch it in the Source monitor.</summary>
+    private void MediaList_DoubleClick(object sender, MouseButtonEventArgs e)
+    {
+        if (MediaList.SelectedItem is MediaItem item && DataContext is MainViewModel main)
+            main.OpenInSourceCommand.Execute(item);
+    }
+
     private void MediaList_KeyDown(object sender, KeyEventArgs e)
     {
         if (e.Key == Key.Delete && Bin?.SelectedItem is MediaItem item)

@@ -252,8 +252,8 @@
     <!-- Square tool button in the timeline's tool column (Select, Razor, ...). -->
     <Style x:Key="ToolButton" TargetType="RadioButton">
         <Setter Property="Width" Value="32"/>
-        <Setter Property="Height" Value="32"/>
-        <Setter Property="Margin" Value="0,2"/>
+        <Setter Property="Height" Value="28"/>
+        <Setter Property="Margin" Value="0,1"/>
         <Setter Property="Foreground" Value="{StaticResource SecondaryTextBrush}"/>
         <Setter Property="FontFamily" Value="{StaticResource IconFont}"/>
         <Setter Property="FontSize" Value="15"/>

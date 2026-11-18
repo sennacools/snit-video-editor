@@ -478,23 +478,53 @@ public partial class TimelineViewModel : ObservableObject
     /// </summary>
     public void AddMedia(MediaItem media, Track track, long start)
     {
+        long length = media.Kind is MediaKind.Image or MediaKind.Text
+            ? (long)Math.Round(MediaImporter.DefaultImageSeconds * Fps)
+            : media.LengthInFrames(Fps);
+        AddMediaPart(media, track, start, 0, length, insert: false);
+    }
+
+    /// <summary>
+    /// Source monitor ("," insert and "." overwrite): puts part of a file (from source frame
+    /// <paramref name="sourceIn"/>, <paramref name="length"/> frames) at the playhead on V1/A1.
+    /// Insert pushes everything after the playhead to the right; overwrite covers what's there.
+    /// </summary>
+    public void PlaceFromSource(MediaItem media, long sourceIn, long length, bool insert)
+    {
+        Track track = media.Kind == MediaKind.Audio ? Project.FirstAudioTrack : Project.FirstVideoTrack;
+        AddMediaPart(media, track, PlayheadFrame, sourceIn, length, insert);
+        PlayheadFrame += length; // like Premiere: ready for the next piece
+    }
+
+    private void AddMediaPart(MediaItem media, Track track, long start, long sourceIn, long length, bool insert)
+    {
         // Pictures and video go on video tracks (titles on V2), sound on audio tracks.
         if (media.Kind == MediaKind.Audio && track.Kind != TrackKind.Audio) track = Project.FirstAudioTrack;
         if (media.Kind != MediaKind.Audio && track.Kind != TrackKind.Video)
             track = (media.Kind == MediaKind.Text ? Project.TitleTrack : Project.FirstVideoTrack);
-        if (track.IsLocked) return;
-
-        long length = media.Kind is MediaKind.Image or MediaKind.Text
-            ? (long)Math.Round(MediaImporter.DefaultImageSeconds * Fps)
-            : media.LengthInFrames(Fps);
+        if (track.IsLocked || length <= 0) return;
 
         SaveUndoPoint();
+
+        if (insert)
+        {
+            // Make room: cut every clip that crosses the playhead, then slide everything after it.
+            foreach (Track t in Project.Tracks.Where(t => !t.IsLocked))
+            {
+                foreach (Clip c in t.Clips.Where(c => c.Start < start && c.End > start).ToList())
+                    TimelineEdits.Split(t, c, start);
+                foreach (Clip c in t.Clips.Where(c => c.Start >= start)) c.Start += length;
+            }
+            foreach (Marker m in Project.Markers.Where(m => m.Frame >= start).ToList())
+                Project.Markers[Project.Markers.IndexOf(m)] = m with { Frame = m.Frame + length };
+        }
+
         Guid? link = media.Kind == MediaKind.Video && media.HasAudio ? Guid.NewGuid() : null;
         var placed = new List<Clip>();
 
         var clip = new Clip
         {
-            Media = media, Start = start, In = 0, Length = length, LinkId = link,
+            Media = media, Start = start, In = sourceIn, Length = length, LinkId = link,
             Title = media.Kind == MediaKind.Text ? new TitleStyle() : null,
         };
         TimelineEdits.ClearRange(track, clip.Start, clip.End, []);

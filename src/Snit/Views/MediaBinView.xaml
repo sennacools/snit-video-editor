@@ -118,7 +118,8 @@
                                  ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                                  PreviewMouseLeftButtonDown="MediaList_PreviewMouseLeftButtonDown"
                                  PreviewMouseMove="MediaList_PreviewMouseMove"
-                                 KeyDown="MediaList_KeyDown">
+                                 KeyDown="MediaList_KeyDown"
+                                 MouseDoubleClick="MediaList_DoubleClick">
                             <ListBox.ItemsPanel>
                                 <ItemsPanelTemplate>
                                     <UniformGrid Columns="2" VerticalAlignment="Top"/>

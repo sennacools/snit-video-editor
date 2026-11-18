@@ -27,6 +27,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
         Timeline = new TimelineViewModel(project);
         Bin = new MediaBinViewModel(project, Timeline);
         Inspector = new InspectorViewModel(Timeline);
+        Source = new SourceMonitorViewModel(() => Timeline);
         playback = CreatePlayer(project);
 
         Timeline.ContentChanged += OnTimelineContentChanged;
@@ -36,6 +37,27 @@ public partial class MainViewModel : ObservableObject, IDisposable
     public TimelineViewModel Timeline { get; }
     public MediaBinViewModel Bin { get; }
     public InspectorViewModel Inspector { get; }
+    public SourceMonitorViewModel Source { get; }
+
+    /// <summary>"Program" (the timeline) or "Source" (one file from the bin).</summary>
+    [ObservableProperty]
+    private string monitorTab = "Program";
+
+    partial void OnMonitorTabChanged(string value)
+    {
+        // Only one monitor plays at a time.
+        if (value == "Source" && IsPlaying) PlayPause();
+        if (value == "Program") Source.Stop();
+    }
+
+    /// <summary>Double-click in the bin: watch the file in the Source monitor.</summary>
+    [RelayCommand]
+    private void OpenInSource(MediaItem? item)
+    {
+        if (item is null || item.IsOffline || !FFmpegLocator.Current.IsAvailable) return;
+        Source.Open(item, project.Settings);
+        MonitorTab = "Source";
+    }
 
     // ===================== Title bar =====================
 
@@ -114,19 +136,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
     /// <summary>The player has new pictures: put each track's picture (or title) on its layer.</summary>
     private void OnFrameReady(LayerFrame?[] bundle)
-    {
-        while (PreviewLayers.Count < bundle.Length) PreviewLayers.Add(new PreviewLayer());
-        for (int i = 0; i < PreviewLayers.Count; i++)
-        {
-            LayerFrame? layer = i < bundle.Length ? bundle[i] : null;
-            if (layer is null) PreviewLayers[i].Hide();
-            else if (layer.Segment.Title is TitleStyle title)
-                PreviewLayers[i].ShowTitle(TitlePicture(title), layer.Segment, project.Settings, layer.Visibility, layer.Brightness, layer.Look);
-            else if (layer.Picture is DecodedFrame picture)
-                PreviewLayers[i].ShowPicture(picture, layer.Segment, project.Settings, layer.Visibility, layer.Brightness, layer.Look);
-        }
-        PlaybackEngine.Release(bundle);
-    }
+        => PreviewLayer.ApplyBundle(PreviewLayers, bundle, project.Settings, TitlePicture);
 
     /// <summary>Titles are drawn once (per text and look) and then remembered.</summary>
     private ImageSource TitlePicture(TitleStyle s)
@@ -467,5 +477,9 @@ public partial class MainViewModel : ObservableObject, IDisposable
     [RelayCommand]
     private void Exit() => Application.Current.MainWindow?.Close();
 
-    public void Dispose() => playback.Dispose();
+    public void Dispose()
+    {
+        playback.Dispose();
+        Source.Dispose();
+    }
 }

@@ -8,6 +8,12 @@ public partial class ProgramMonitorView : UserControl
 {
     public ProgramMonitorView() => InitializeComponent();
 
+    /// <summary>The Source scrub bar fits the whole file in its width.</summary>
+    private void SourceRuler_SizeChanged(object sender, System.Windows.SizeChangedEventArgs e)
+    {
+        if (DataContext is ViewModels.MainViewModel main) main.Source.ScrubWidth = e.NewSize.Width;
+    }
+
     /// <summary>A small still of what the monitor shows (without the guides), for the export dialog.</summary>
     public ImageSource? Capture()
     {

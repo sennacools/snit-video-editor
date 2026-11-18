@@ -74,7 +74,7 @@
             <!-- ============ Tool column ============ -->
             <Border Grid.RowSpan="4" Background="{StaticResource PanelBrush}"
                     BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,1,0">
-                <StackPanel Margin="0,8,0,0" HorizontalAlignment="Center">
+                <StackPanel Margin="0,4,0,0" HorizontalAlignment="Center">
                     <RadioButton Style="{StaticResource ToolButton}" ToolTip="Select (V)"
                                  IsChecked="{Binding Timeline.ActiveTool, Converter={StaticResource EqualsConverter}, ConverterParameter=Select}">
                         <!-- mouse pointer arrow -->

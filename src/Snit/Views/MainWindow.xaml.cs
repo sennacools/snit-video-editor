@@ -79,6 +79,36 @@ public partial class MainWindow : Window
         bool shift = Keyboard.Modifiers.HasFlag(ModifierKeys.Shift);
         TimelineViewModel tl = viewModel.Timeline;
 
+        // Source monitor showing: the playback keys and the marks work on it.
+        if (viewModel.MonitorTab == "Source" && !ctrl)
+        {
+            SourceMonitorViewModel src = viewModel.Source;
+            Action? sourceAction = e.Key switch
+            {
+                Key.Space or Key.K => src.PlayPause,
+                Key.Left => src.StepBack,
+                Key.Right => src.StepForward,
+                Key.Home => src.GoToStart,
+                Key.End => src.GoToEnd,
+                Key.I => src.MarkIn,
+                Key.O => src.MarkOut,
+                _ => null,
+            };
+            if (sourceAction is not null)
+            {
+                sourceAction();
+                e.Handled = true;
+                return;
+            }
+        }
+        if (!ctrl && e.Key is Key.OemComma or Key.OemPeriod)
+        {
+            if (e.Key == Key.OemComma) viewModel.Source.Insert();
+            else viewModel.Source.Overwrite();
+            e.Handled = true;
+            return;
+        }
+
         // Single keys without Ctrl: tools and the shuttle (J = back, K = stop, L = forward, faster each press).
         Action? action = (e.Key, ctrl, shift) switch
         {

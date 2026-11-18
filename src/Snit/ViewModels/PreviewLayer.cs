@@ -31,6 +31,26 @@ public partial class PreviewLayer : ObservableObject
 
     public void Hide() => IsVisible = false;
 
+    /// <summary>
+    /// Puts a bundle of pictures from the player on a monitor's layers (one per place in the
+    /// bundle; extra layers are hidden) and gives the picture buffers back.
+    /// </summary>
+    public static void ApplyBundle(IList<PreviewLayer> layers, LayerFrame?[] bundle, ProjectSettings frame,
+        Func<TitleStyle, ImageSource> titlePicture)
+    {
+        while (layers.Count < bundle.Length) layers.Add(new PreviewLayer());
+        for (int i = 0; i < layers.Count; i++)
+        {
+            LayerFrame? layer = i < bundle.Length ? bundle[i] : null;
+            if (layer is null) layers[i].Hide();
+            else if (layer.Segment.Title is TitleStyle title)
+                layers[i].ShowTitle(titlePicture(title), layer.Segment, frame, layer.Visibility, layer.Brightness, layer.Look);
+            else if (layer.Picture is DecodedFrame picture)
+                layers[i].ShowPicture(picture, layer.Segment, frame, layer.Visibility, layer.Brightness, layer.Look);
+        }
+        PlaybackEngine.Release(bundle);
+    }
+
     /// <summary>Shows decoded pixels (video or picture).</summary>
     public void ShowPicture(DecodedFrame picture, VideoSegment segment, ProjectSettings frame, double visibility = 1, double brightness = 1, ClipLook? look = null)
     {

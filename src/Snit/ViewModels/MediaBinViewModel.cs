@@ -122,6 +122,16 @@ public partial class MediaBinViewModel : ObservableObject
         {
             // No thumbnail is not a big deal; the bin shows a placeholder.
         }
+
+        try
+        {
+            item.Waveform = await MediaImporter.MakeWaveformAsync(item);
+            timeline.RequestRedraw();
+        }
+        catch (Exception)
+        {
+            // No waveform: the clip just shows without one.
+        }
     }
 
     /// <summary>Removes a file from the bin (and its clips from the timeline, after asking).</summary>

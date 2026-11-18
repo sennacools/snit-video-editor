@@ -39,6 +39,15 @@ public partial class MediaItem : ObservableObject
     [ObservableProperty]
     private ImageSource? thumbnail;
 
+    /// <summary>
+    /// The sound's loudness for drawing the waveform: the loudest point of every 1/100 second,
+    /// from 0 (silent) to 1 (as loud as possible). Not saved; made again when a project opens.
+    /// </summary>
+    [ObservableProperty]
+    private float[]? waveform;
+
+    public const int WaveformPointsPerSecond = 100;
+
     /// <summary>True when the file can't be found any more (moved or deleted).</summary>
     [ObservableProperty]
     private bool isOffline;

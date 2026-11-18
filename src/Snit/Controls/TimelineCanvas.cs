@@ -137,11 +137,7 @@ public class TimelineCanvas : FrameworkElement
             textLeft = rect.Left + Math.Min(w, rect.Width) + 6;
         }
         if (isAudio)
-        {
-            // A simple centre line for now; real waveforms come later.
-            double mid = Math.Round(rect.Top + rect.Height / 2) + 0.5;
-            dc.DrawLine(new Pen(Res("WaveformBrush"), 1) { DashStyle = DashStyles.Dot }, new Point(rect.Left, mid), new Point(rect.Right, mid));
-        }
+            DrawWaveform(dc, tl, clip, rect);
 
         string name = clip.Media.IsOffline ? clip.Name + "  (file missing)" : clip.Name;
         var label = Text(name, Res("TextBrush"), 11, dpi, FontWeights.SemiBold);
@@ -149,6 +145,59 @@ public class TimelineCanvas : FrameworkElement
 
         dc.Pop();
         dc.DrawRoundedRectangle(null, pen, Inflate(rect, selected ? -1 : -0.5), 5, 5);
+    }
+
+    /// <summary>
+    /// Draws the sound as vertical lines: one per pixel, as tall as the loudest moment in that
+    /// pixel. The clip's volume and fades are included, so you can see a fade.
+    /// </summary>
+    private void DrawWaveform(DrawingContext dc, TimelineViewModel tl, Clip clip, Rect rect)
+    {
+        float[]? points = clip.Media.Waveform;
+        double mid = rect.Top + rect.Height / 2 + 4; // a little lower, below the clip name
+        double maxHeight = rect.Height / 2 - 6;
+
+        if (points is null || points.Length == 0)
+        {
+            // Still being read (or no sound): a thin centre line.
+            dc.DrawLine(new Pen(Res("WaveformBrush"), 1) { DashStyle = DashStyles.Dot },
+                new Point(rect.Left, Math.Round(mid) + 0.5), new Point(rect.Right, Math.Round(mid) + 0.5));
+            return;
+        }
+
+        double fps = tl.Fps, pps = tl.PixelsPerSecond;
+        double clipSeconds = clip.Length / fps;
+        double gain = Math.Pow(10, clip.VolumeDb / 20); // decibels → multiplier
+        double perPoint = 1.0 / MediaItem.WaveformPointsPerSecond;
+
+        double left = Math.Max(rect.Left, 0), right = Math.Min(rect.Right, ActualWidth);
+        var geometry = new StreamGeometry();
+        using (var g = geometry.Open())
+        {
+            for (double x = Math.Floor(left); x < right; x++)
+            {
+                double secondsIntoClip = (x - rect.Left) / pps;
+                double sourceSeconds = clip.In / fps + secondsIntoClip;
+
+                // Loudest point within this pixel.
+                int from = (int)(sourceSeconds / perPoint);
+                int to = Math.Max(from + 1, (int)((sourceSeconds + 1 / pps) / perPoint));
+                float peak = 0;
+                for (int i = Math.Max(0, from); i < to && i < points.Length; i++)
+                    if (points[i] > peak) peak = points[i];
+
+                double envelope = gain;
+                if (clip.FadeInSeconds > 0) envelope *= Math.Clamp(secondsIntoClip / clip.FadeInSeconds, 0, 1);
+                if (clip.FadeOutSeconds > 0) envelope *= Math.Clamp((clipSeconds - secondsIntoClip) / clip.FadeOutSeconds, 0, 1);
+
+                // Square root: quiet sound still shows clearly (closer to how loud it sounds).
+                double h = Math.Max(0.5, Math.Sqrt(Math.Min(1, peak * envelope)) * maxHeight);
+                g.BeginFigure(new Point(x + 0.5, mid - h), false, false);
+                g.LineTo(new Point(x + 0.5, mid + h), true, false);
+            }
+        }
+        geometry.Freeze();
+        dc.DrawGeometry(null, new Pen(Res("WaveformBrush"), 1), geometry);
     }
 
     private void DrawDropGhost(DrawingContext dc, TimelineViewModel tl, double dpi)

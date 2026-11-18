@@ -97,6 +97,41 @@ public static class MediaImporter
         return bitmap;
     }
 
+    /// <summary>
+    /// Reads the whole sound once (as mono, 4000 samples a second, which is plenty for a picture)
+    /// and keeps the loudest sample of every 1/100 second. Returns null for files without sound.
+    /// </summary>
+    public static async Task<float[]?> MakeWaveformAsync(MediaItem item)
+    {
+        string? ffmpeg = FFmpegLocator.Current.FfmpegPath;
+        if (ffmpeg is null || !item.HasAudio || item.IsOffline) return null;
+
+        const int sampleRate = 4000;
+        var result = await ProcessRunner.RunAsync(ffmpeg,
+        [
+            "-hide_banner", "-loglevel", "error", "-nostdin", "-i", item.FilePath,
+            "-vn", "-ac", "1", "-ar", sampleRate.ToString(), "-f", "s16le", "pipe:1",
+        ]);
+        if (result.ExitCode != 0 || result.Output.Length < 2) return null;
+
+        return await Task.Run(() =>
+        {
+            int samplesPerPoint = sampleRate / MediaItem.WaveformPointsPerSecond;
+            int sampleCount = result.Output.Length / 2;
+            var points = new float[(sampleCount + samplesPerPoint - 1) / samplesPerPoint];
+
+            for (int i = 0; i < sampleCount; i++)
+            {
+                // Each sample is a 16-bit number from -32768 to 32767.
+                short sample = BitConverter.ToInt16(result.Output, i * 2);
+                float loudness = Math.Abs(sample / 32768f);
+                int point = i / samplesPerPoint;
+                if (loudness > points[point]) points[point] = loudness;
+            }
+            return points;
+        });
+    }
+
     // ---- Small JSON helpers ----
 
     private static bool IsAttachedPicture(JsonElement stream)

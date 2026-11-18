@@ -8,8 +8,8 @@ It's built with C#, WPF and FFmpeg.
 ![Snit main window](docs/screenshot.png)
 
 > **Status:** work in progress. You can import media, edit on the timeline, preview with
-> sound, add titles, adjust clip volume and fades, save projects and export to MP4.
-> Picture effects (transform, colour, speed) are next.
+> sound, add titles, change size/position/colour/speed of clips, adjust volume and fades,
+> save projects and export to MP4. Transitions, keyframes and more formats are next.
 
 ## What works
 
@@ -22,6 +22,10 @@ It's built with C#, WPF and FFmpeg.
   font, size, colour, bold, shadow and position in the inspector
 - **Sound**: waveforms on audio clips, per-clip volume and fade in/out in the inspector,
   and live stereo level meters while playing
+- **Picture**: scale, rotation, opacity and position (Transform), exposure, contrast,
+  saturation and temperature (Colour) per clip in the inspector; the preview stacks the tracks
+  so a smaller or see-through clip on V2 shows V1 underneath
+- **Speed** from 10% to 400% and **reverse**, for video and its sound together
 - **Undo / redo** for every timeline edit (one slider drag or one bit of typing is one step)
 - **Projects** saved as `.snit` files (plain JSON; media files are referenced, never copied)
 - **Export** to MP4 (H.264 video, AAC 320 kbps sound) at 720p, 1080p, 4K or vertical 1080×1920,
@@ -87,6 +91,11 @@ The preview runs `ffmpeg` in the background and reads raw frames from it, alread
 `ffmpeg` running, so it is fast; jumping somewhere else starts a new one at that exact frame.
 Sound is mixed by `ffmpeg` too and played with [NAudio](https://github.com/naudio/NAudio).
 
+Each video track is decoded separately (with the clip's colours already applied by `ffmpeg`)
+and the monitor stacks the tracks, applying size, rotation, position and opacity itself.
+Tracks hidden behind a full-screen video are skipped. Reversed clips play choppy in the
+preview, because every frame has to be looked up on its own; they export smoothly.
+
 ## How export works
 
 Snit turns the timeline into a single `ffmpeg` command. Each clip becomes an input cut to the
@@ -109,3 +118,4 @@ isn't installed.
 
 To refresh the screenshot above: `dotnet run --project src/Snit -- --screenshot docs/screenshot.png`
 (you can put a `.snit` file before `--screenshot` to show a project).
+To export a project without opening the dialog: `Snit.exe project.snit --export video.mp4`.

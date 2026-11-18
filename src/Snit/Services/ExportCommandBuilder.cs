@@ -74,20 +74,28 @@ public static class ExportCommandBuilder
             else if (isStill)
                 args.AddRange(["-loop", "1", "-framerate", fps, "-t", Sec(clip.Length), "-i", clip.Media.FilePath]);
             else
-                args.AddRange(["-ss", Sec(clip.In), "-t", Sec(clip.Length), "-i", clip.Media.FilePath]);
+                // A sped-up clip reads more of the file: SourceLength frames, shown in Length frames.
+                args.AddRange(["-ss", Sec(clip.In), "-t", Sec(clip.SourceLength), "-i", clip.Media.FilePath]);
 
-            // Pictures and titles keep their see-through parts (alpha); video is solid.
-            string padColor = isStill ? ":color=black@0" : "";
-            string pixelFormat = isStill ? "yuva420p" : "yuv420p";
+            // 1. Speed and reverse (not for pictures and titles), then the export frame rate, cut to the exact length.
+            string speed = isStill ? "" : VideoFilters.VideoSpeed(clip.Speed, clip.Reverse);
+            // 2. Fit inside the frame (keeping its shape), then colour, then size/rotation/opacity.
+            //    Pictures and titles keep their see-through parts.
             string label = $"v{input}";
             filters.Add(
-                $"[{input}:v:0]fps={fps}," +
-                $"scale={w}:{h}:force_original_aspect_ratio=decrease,pad={w}:{h}:(ow-iw)/2:(oh-ih)/2{padColor},setsar=1," +
-                $"format={pixelFormat},setpts=PTS-STARTPTS+{Sec(clip.Start)}/TB[{label}]");
+                $"[{input}:v:0]{speed.TrimStart(',')}{(speed.Length > 0 ? "," : "")}fps={fps},trim=duration={Sec(clip.Length)}," +
+                $"scale={w}:{h}:force_original_aspect_ratio=decrease,setsar=1" +
+                $"{VideoFilters.Color(clip.Look)}{VideoFilters.Transform(clip.Look, keepTransparency: isStill)}," +
+                $"setpts=PTS-STARTPTS+{Sec(clip.Start)}/TB[{label}]");
 
+            // 3. Lay it on top, centred and then moved by the clip's position (measured in the
+            //    project frame, so scaled to the export size). eof_action=pass: once the clip
+            //    ends, the picture underneath shows again.
+            string dx = ProcessRunner.Num(Math.Round(clip.Look.PositionX * fit, 2));
+            string dy = ProcessRunner.Num(Math.Round(clip.Look.PositionY * fit, 2));
             string next = $"o{input}";
-            // eof_action=pass: once the clip ends, the picture underneath shows again.
-            filters.Add($"[{current}][{label}]overlay=eof_action=pass:format=yuv420[{next}]");
+            filters.Add($"[{current}][{label}]overlay=x=(main_w-overlay_w)/2+({dx}):y=(main_h-overlay_h)/2+({dy})" +
+                        $":eof_action=pass:format=yuv420[{next}]");
             current = next;
             input++;
         }
@@ -99,11 +107,14 @@ public static class ExportCommandBuilder
         var audioLabels = new List<string>();
         foreach (Clip clip in audioClips)
         {
-            args.AddRange(["-ss", Sec(clip.In), "-t", Sec(clip.Length), "-i", clip.Media.FilePath]);
+            args.AddRange(["-ss", Sec(clip.In), "-t", Sec(clip.SourceLength), "-i", clip.Media.FilePath]);
             long delayMs = (long)Math.Round(clip.Start / projectFps * 1000);
             string label = $"a{input}";
+            // Speed/reverse first (so fades are measured on the timeline), then volume and fades.
+            string speed = VideoFilters.AudioSpeed(clip.Speed, clip.Reverse);
             string effects = AudioFilters.ClipEffects(clip.VolumeDb, clip.FadeInSeconds, clip.FadeOutSeconds, clip.Length / projectFps);
-            filters.Add($"[{input}:a:0]aresample={SampleRate},aformat=channel_layouts=stereo{effects},adelay={delayMs}:all=1[{label}]");
+            filters.Add($"[{input}:a:0]aresample={SampleRate},aformat=channel_layouts=stereo{speed}{effects}," +
+                        $"atrim=0:{Sec(clip.Length)},adelay={delayMs}:all=1[{label}]");
             audioLabels.Add(label);
             input++;
         }

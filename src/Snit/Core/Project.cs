@@ -114,6 +114,9 @@ public sealed class Clip
     /// <summary>Size, rotation, opacity, position and colour. Replaced as a whole (it never changes inside).</summary>
     public ClipLook Look { get; set; } = ClipLook.Default;
 
+    /// <summary>Effects (blur, crop, green screen…), applied top to bottom. Replaced as a whole when changed.</summary>
+    public IReadOnlyList<ClipEffect> Effects { get; set; } = [];
+
     /// <summary>Animated transform settings (see <see cref="Core.Keyframes"/>). Replaced as a whole when changed.</summary>
     public IReadOnlyDictionary<string, IReadOnlyList<Keyframe>> Keyframes { get; set; } = Core.Keyframes.None;
 

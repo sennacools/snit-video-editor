@@ -821,6 +821,18 @@ public partial class TimelineViewModel : ObservableObject
         dragAnchor = null;
     }
 
+    // ===================== Effects =====================
+
+    /// <summary>Adds an effect to a clip on a video track (at the bottom of its effect list).</summary>
+    public void AddEffect(Clip clip, string kind)
+    {
+        if (IsLocked(clip) || Project.TrackOf(clip).Kind != TrackKind.Video || EffectCatalog.Find(kind) is not EffectDefinition definition) return;
+        SaveUndoPoint();
+        clip.Effects = [.. clip.Effects, definition.Create()];
+        Select(clip, add: false);
+        NotifyContentChanged();
+    }
+
     // ===================== Transitions =====================
 
     /// <summary>

@@ -9,7 +9,7 @@ public sealed record VideoSegment(
     long In, long SourceLength, double Speed, bool Reverse,
     ClipLook Look, int MediaWidth, int MediaHeight, Guid ClipId, TitleStyle? Title,
     long FadeInFrames = 0, long FadeOutFrames = 0, long BlackInFrames = 0, long BlackOutFrames = 0, int Slot = 0,
-    IReadOnlyDictionary<string, IReadOnlyList<Keyframe>>? Keyframes = null)
+    IReadOnlyDictionary<string, IReadOnlyList<Keyframe>>? Keyframes = null, IReadOnlyList<ClipEffect>? Effects = null)
 {
     /// <summary>The look at a timeline frame, with animation applied.</summary>
     public ClipLook LookAt(long frame) => Keyframes is null ? Look : Core.Keyframes.LookAt(Look, Keyframes, frame - Start);
@@ -48,6 +48,8 @@ public sealed record VideoSegment(
     public bool CoversFrame(int frameWidth, int frameHeight, ClipLook Look)
     {
         if (Kind != MediaKind.Video || MediaWidth <= 0 || MediaHeight <= 0) return false;
+        // Crop and green screen make parts see-through: what is below may show.
+        if (Effects?.Any(e => e.Enabled && EffectCatalog.Find(e.Kind)?.MakesTransparency == true) == true) return false;
         if (Look.Scale < 100 || Look.Rotation != 0 || Look.Opacity < 100 || Look.PositionX != 0 || Look.PositionY != 0) return false;
         double shape = (double)MediaWidth / MediaHeight, frameShape = (double)frameWidth / frameHeight;
         return Math.Abs(shape - frameShape) / frameShape < 0.01 || Look.Scale > 100 * Math.Max(shape / frameShape, frameShape / shape);
@@ -81,7 +83,7 @@ public static class PreviewPlan
                     r.Clip.Start, r.Clip.End, r.Clip.Media.FilePath, r.Clip.Media.Kind,
                     r.Clip.In, r.Clip.SourceLength, r.Clip.Speed, r.Clip.Reverse,
                     r.Clip.Look, r.Clip.Media.Width, r.Clip.Media.Height, r.Original.Id, r.Clip.Title?.Copy(),
-                    r.FadeInFrames, r.FadeOutFrames, r.BlackInFrames, r.BlackOutFrames, r.Slot, r.Clip.Keyframes))
+                    r.FadeInFrames, r.FadeOutFrames, r.BlackInFrames, r.BlackOutFrames, r.Slot, r.Clip.Keyframes, r.Clip.Effects))
                 .ToList()))
             .ToList();
 

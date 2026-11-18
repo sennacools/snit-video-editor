@@ -76,7 +76,8 @@ public static class ExportCommandBuilder
         {
             Clip clip = rc.Clip;
             bool isStill = clip.Media.Kind is MediaKind.Image or MediaKind.Text;
-            bool fadesThrough = rc.FadeInFrames > 0 || rc.FadeOutFrames > 0; // needs see-through edges
+            bool fadesThrough = rc.FadeInFrames > 0 || rc.FadeOutFrames > 0  // needs see-through edges
+                                || EffectFilters.MakesTransparency(clip.Effects);
             if (clip.Title is TitleStyle title)
             {
                 workFolder ??= Directory.CreateTempSubdirectory("snit-export-").FullName;
@@ -114,7 +115,7 @@ public static class ExportCommandBuilder
             filters.Add(
                 $"[{input}:v:0]{speed.TrimStart(',')}{(speed.Length > 0 ? "," : "")}fps={fps},trim=duration={Sec(clip.Length)}," +
                 $"scale={w}:{h}:force_original_aspect_ratio=decrease,setsar=1" +
-                $"{VideoFilters.Color(clip.Look)}" +
+                $"{VideoFilters.Color(clip.Look)}{EffectFilters.Chain(clip.Effects)}" +
                 $"{VideoFilters.Fade(rc.BlackInFrames, rc.BlackOutFrames, clip.Length, projectFps, alpha: false)}" +
                 $"{transform}" +
                 $"{VideoFilters.Fade(rc.FadeInFrames, rc.FadeOutFrames, clip.Length, projectFps, alpha: true)}," +

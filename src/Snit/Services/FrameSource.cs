@@ -55,12 +55,12 @@ public sealed class FrameSource(int previewWidth, int previewHeight, double fps)
         string? ffmpeg = FFmpegLocator.Current.FfmpegPath;
         if (ffmpeg is null) return null;
         FramePool pool = PoolFor(segment);
-        string color = VideoFilters.Color(segment.Look);
+        string color = Recipe(segment);
 
         if (segment.Kind == MediaKind.Image)
             return GetStill(ffmpeg, segment, pool, color);
 
-        string key = $"{layer}|{segment.DecoderKey}|{pool.Width}x{pool.Height}";
+        string key = $"{layer}|{segment.Path}|{color}|{pool.Width}x{pool.Height}";
         int index = decoders.FindIndex(d => d.Key == key);
         OpenDecoder? open = index >= 0 ? decoders[index] : null;
 
@@ -112,7 +112,7 @@ public sealed class FrameSource(int previewWidth, int previewHeight, double fps)
         string? ffmpeg = FFmpegLocator.Current.FfmpegPath;
         if (ffmpeg is null || segment.Kind != MediaKind.Video) return;
         FramePool pool = PoolFor(segment);
-        string key = $"{layer}|{segment.DecoderKey}|{pool.Width}x{pool.Height}";
+        string key = $"{layer}|{segment.Path}|{Recipe(segment)}|{pool.Width}x{pool.Height}";
         long first = segment.SourceFrameAt(segment.Start);
         if (decoders.Any(d => d.Key == key && d.Decoder.NextFrame <= first && first - d.Decoder.NextFrame <= fps * 2)) return;
 
@@ -122,8 +122,12 @@ public sealed class FrameSource(int previewWidth, int previewHeight, double fps)
             decoders[existing].Decoder.Dispose();
             decoders.RemoveAt(existing);
         }
-        Add(new OpenDecoder(key, new VideoDecoder(ffmpeg, segment.Path, first, fps, pool, VideoFilters.Color(segment.Look))), atBack: true);
+        Add(new OpenDecoder(key, new VideoDecoder(ffmpeg, segment.Path, first, fps, pool, Recipe(segment))), atBack: true);
     }
+
+    /// <summary>The clip's colour and effects as one FFmpeg recipe (the same one the export uses).</summary>
+    private static string Recipe(VideoSegment segment)
+        => VideoFilters.Color(segment.Look) + EffectFilters.Chain(segment.Effects ?? []);
 
     private void Touch(int index)
     {

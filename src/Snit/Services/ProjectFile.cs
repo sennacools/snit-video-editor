@@ -49,6 +49,7 @@ public static class ProjectFile
         public Transition? TransitionIn { get; init; }
         public Transition? TransitionOut { get; init; }
         public Dictionary<string, List<Keyframe>>? Keyframes { get; init; }
+        public List<ClipEffect>? Effects { get; init; }
     }
 
     /// <summary>The text and look of a title clip (titles have no media file).</summary>
@@ -88,6 +89,7 @@ public static class ProjectFile
                         Speed = c.SpeedPercent, Reverse = c.Reverse,
                         TransitionIn = c.TransitionIn, TransitionOut = c.TransitionOut,
                         Keyframes = c.Keyframes.Count == 0 ? null : c.Keyframes.ToDictionary(p => p.Key, p => p.Value.ToList()),
+                        Effects = c.Effects.Count == 0 ? null : c.Effects.ToList(),
                         Title = c.Title is { } t ? new TitleData
                         {
                             Text = t.Text, FontFamily = t.FontFamily, FontSize = t.FontSize, Color = t.Color,
@@ -167,6 +169,7 @@ public static class ProjectFile
                     Look = c.Look ?? ClipLook.Default,
                     SpeedPercent = c.Speed > 0 ? c.Speed : 100, Reverse = c.Reverse,
                     TransitionIn = c.TransitionIn, TransitionOut = c.TransitionOut,
+                    Effects = c.Effects ?? [],
                     Keyframes = c.Keyframes is null ? Core.Keyframes.None
                         : c.Keyframes.ToDictionary(p => p.Key, p => (IReadOnlyList<Keyframe>)p.Value.OrderBy(k => k.Frame).ToList()),
                     Title = c.Title is { } d ? new TitleStyle

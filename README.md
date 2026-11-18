@@ -14,9 +14,13 @@ It's built with C#, WPF and FFmpeg.
 ## What works
 
 - **Import** video, audio and pictures (Import button, Ctrl+I, or drop files on the media bin)
-- **Timeline** with tracks V1, V2, A1, A2: drag media from the bin, move clips (also between tracks),
-  trim edges, cut with the razor, delete or ripple-delete, snapping, hide/mute/lock tracks.
-  Videos with sound get a linked audio clip that is edited together with the picture.
+- **Timeline** with as many video and audio tracks as you like ("+ V" / "+ A", right-click a track
+  header to delete it): drag media from the bin, move clips (also between tracks), trim edges,
+  cut with the razor, delete or ripple-delete, copy/cut/paste, box-select, snapping,
+  hide/mute/lock tracks. Videos with sound get a linked audio clip that is edited together with the picture.
+- **Editing tools** like Premiere: ripple trim, rolling edit, slip, slide and rate stretch
+- **Source monitor**: double-click a file in the bin, mark in/out, then Insert or Overwrite at the playhead
+- **Markers** (M) on the ruler, with names; clips snap to them
 - **Preview** with sound, frame-accurate scrubbing on the ruler, and frame-by-frame stepping
 - **Titles**: add with the T tool, the Text tab or "Add title at playhead"; change the text,
   font, size, colour, bold, shadow and position in the inspector
@@ -32,7 +36,8 @@ It's built with C#, WPF and FFmpeg.
   the clip's sound cross-fades along. A dissolve uses footage just beyond the cut if the files have it
 - **In and out marks** (I and O) to export just a part of the timeline
 - **Undo / redo** for every timeline edit (one slider drag or one bit of typing is one step)
-- **Projects** saved as `.snit` files (plain JSON; media files are referenced, never copied)
+- **Projects** saved as `.snit` files (plain JSON; media files are referenced, never copied),
+  with **auto-save** every two minutes (a separate copy, offered back after a crash) and **Open recent**
 - **Export** to MP4 (H.264 or H.265), WebM (VP9), MOV (ProRes 422 HQ), GIF or MP3 at 720p,
   1080p, 4K or vertical 1080×1920, 24–60 fps, the whole timeline or just in-to-out, with a
   quality slider, a progress bar with time left, and a Stop button. H.264/H.265 can use your
@@ -47,11 +52,15 @@ It's built with C#, WPF and FFmpeg.
 | ← / → | Previous / next frame |
 | ↑ / ↓ | Previous / next cut |
 | Home / End | Go to start / end |
-| I / O | Mark in / mark out (Ctrl+Shift+X clears both) |
+| I / O | Mark in / mark out (Ctrl+Shift+X clears both); in the Source monitor: its own marks |
+| , / . | Insert / overwrite from the Source monitor |
+| M | Add marker (Shift+M next, Ctrl+Shift+M previous) |
 | V / C / B / T / H / Z | Select / razor / ripple trim / text / hand / zoom tool |
+| N / Y / U / R | Rolling edit / slip / slide / rate stretch tool |
 | S | Snapping on / off |
 | Delete | Delete selected clips (Shift+Delete: ripple delete) |
 | Ctrl+K | Cut clips at the playhead |
+| Ctrl+C / Ctrl+X / Ctrl+V | Copy / cut / paste clips (paste goes to the playhead) |
 | Ctrl+D | Cross dissolve at the cut nearest the playhead |
 | Ctrl+Z / Ctrl+Shift+Z | Undo / redo |
 | = / - | Zoom timeline in / out (Ctrl+mouse wheel also zooms) |

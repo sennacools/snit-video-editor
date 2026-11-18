@@ -281,6 +281,9 @@ public sealed class TitleStyle
     /// <summary>A soft dark shadow behind the letters, so they stay readable on bright video.</summary>
     public bool Shadow { get; set; } = true;
 
+    /// <summary>A box behind the text, as #AARRGGBB (e.g. see-through black); "" = no box.</summary>
+    public string Box { get; set; } = "";
+
     /// <summary>Where the middle of the text sits: 0 = left/top edge, 0.5 = centre, 1 = right/bottom edge.</summary>
     public double X { get; set; } = 0.5;
     public double Y { get; set; } = 0.5;

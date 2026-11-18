@@ -15,6 +15,7 @@
             <conv:EqualsConverter x:Key="EqualsConverter"/>
             <conv:WorkspaceVisibilityConverter x:Key="WorkspaceVisibility"/>
             <conv:PanTextConverter x:Key="PanText"/>
+            <conv:TitlePreviewConverter x:Key="TitlePreview"/>
             <conv:SixteenByNineConverter x:Key="SixteenByNine"/>
             <conv:InverseBoolToVisibilityConverter x:Key="InverseBoolToVisibility"/>
         </ResourceDictionary>

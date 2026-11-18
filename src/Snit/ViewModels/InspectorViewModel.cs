@@ -203,6 +203,13 @@ public partial class InspectorViewModel : ObservableObject
         set => ChangeTitle(nameof(TitleShadow), s => s.Shadow = value);
     }
 
+    /// <summary>A see-through dark box behind the text.</summary>
+    public bool TitleBox
+    {
+        get => Style is { Box.Length: > 0 };
+        set => ChangeTitle(nameof(TitleBox), s => s.Box = value ? (s.Box.Length > 0 ? s.Box : TitleTemplates.DarkBox) : "");
+    }
+
     /// <summary>Position in percent: 0 = left edge, 50 = centre, 100 = right edge.</summary>
     public double TitleX
     {

@@ -50,6 +50,14 @@ public static class TitleRenderer
         var visual = new DrawingVisual();
         using (DrawingContext dc = visual.RenderOpen())
         {
+            if (style.Box.Length > 0 && IsColor(style.Box) && style.Text.Trim().Length > 0)
+            {
+                // A rounded box just around the letters (the widest line decides its width).
+                double pad = style.FontSize * scale * 0.35;
+                var box = new Rect(style.X * width - text.Width / 2 - pad, origin.Y - pad * 0.6,
+                                   text.Width + pad * 2, text.Height + pad * 1.2);
+                dc.DrawRoundedRectangle(new SolidColorBrush(ParseColor(style.Box)), null, box, pad * 0.4, pad * 0.4);
+            }
             if (style.Shadow)
             {
                 // A soft shadow: a few faint copies of the text slightly down and to the right.

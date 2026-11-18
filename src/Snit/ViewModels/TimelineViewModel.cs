@@ -531,7 +531,7 @@ public partial class TimelineViewModel : ObservableObject
         var clip = new Clip
         {
             Media = media, Start = start, In = sourceIn, Length = length, LinkId = link,
-            Title = media.Kind == MediaKind.Text ? new TitleStyle() : null,
+            Title = media.Kind == MediaKind.Text ? (NextTitleStyle?.Copy() ?? new TitleStyle()) : null,
         };
         TimelineEdits.ClearRange(track, clip.Start, clip.End, []);
         track.Clips.Add(clip);
@@ -563,6 +563,20 @@ public partial class TimelineViewModel : ObservableObject
     /// <summary>Adds a new title (5 seconds, on V2) at the playhead.</summary>
     [RelayCommand]
     private void AddTitleAtPlayhead() => AddMedia(MediaItem.Title, Project.TitleTrack, PlayheadFrame);
+
+    /// <summary>
+    /// The look the next new title gets (set while a title template is dragged from the Text tab);
+    /// null = the plain title.
+    /// </summary>
+    public TitleStyle? NextTitleStyle { get; set; }
+
+    /// <summary>Adds a title with a template's look at the playhead (double-click in the Text tab).</summary>
+    public void AddTitleAtPlayhead(TitleStyle style)
+    {
+        NextTitleStyle = style;
+        try { AddTitleAtPlayhead(); }
+        finally { NextTitleStyle = null; }
+    }
 
     /// <summary>Removes every clip that uses this media file (when it's removed from the bin).</summary>
     public void RemoveClipsUsing(MediaItem media)

@@ -160,23 +160,37 @@
                         </Style>
                     </StackPanel.Style>
 
-                    <!-- Drag this onto the timeline, like a media file. -->
-                    <Border x:Name="TitleTile" Width="124" HorizontalAlignment="Left" Cursor="Hand"
-                            Background="Transparent" ToolTip="Drag onto a video track"
-                            PreviewMouseLeftButtonDown="TitleTile_MouseDown" PreviewMouseMove="TitleTile_MouseMove">
-                        <StackPanel>
-                            <Border CornerRadius="5" Height="70" Background="{StaticResource TextClipBrush}"
-                                    BorderBrush="{StaticResource TextClipBorderBrush}" BorderThickness="1">
-                                <TextBlock Text="Aa" FontSize="26" FontWeight="Bold" Foreground="White"
-                                           HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                            </Border>
-                            <TextBlock Text="Title" Margin="1,5,1,0" FontSize="11" Foreground="{StaticResource SecondaryTextBrush}"/>
-                        </StackPanel>
-                    </Border>
+                    <!-- Ready-made titles: drag one onto a video track (like a media file), or double-click for the playhead. -->
+                    <ItemsControl ItemsSource="{x:Static core:TitleTemplates.All}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <WrapPanel/>
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border Width="112" Margin="0,0,8,10" Cursor="Hand" Background="Transparent" Tag="{Binding}"
+                                        ToolTip="Drag onto a video track, or double-click to add it at the playhead"
+                                        PreviewMouseLeftButtonDown="TitleTile_MouseDown" PreviewMouseMove="TitleTile_MouseMove">
+                                    <StackPanel>
+                                        <Border CornerRadius="5" Height="63" ClipToBounds="True"
+                                                BorderBrush="{StaticResource TextClipBorderBrush}" BorderThickness="1">
+                                            <Border.Background>
+                                                <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                                                    <GradientStop Color="#3A4A5E" Offset="0"/>
+                                                    <GradientStop Color="#1D2633" Offset="1"/>
+                                                </LinearGradientBrush>
+                                            </Border.Background>
+                                            <Image Source="{Binding Style, Converter={StaticResource TitlePreview}}" Stretch="Fill"/>
+                                        </Border>
+                                        <TextBlock Text="{Binding Name}" Margin="1,5,1,0" FontSize="11" Foreground="{StaticResource SecondaryTextBrush}"/>
+                                    </StackPanel>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
 
-                    <Button Content="Add title at playhead" HorizontalAlignment="Left" Margin="0,14,0,0"
-                            Command="{Binding Timeline.AddTitleAtPlayheadCommand}"/>
-                    <TextBlock Style="{StaticResource MutedText}" TextWrapping="Wrap" Margin="0,12,0,0"
+                    <TextBlock Style="{StaticResource MutedText}" TextWrapping="Wrap" Margin="0,4,0,0"
                                Text="Or pick the T tool under the timeline and click on a video track. Change the text, font and colour in the inspector on the right."/>
                 </StackPanel>
 

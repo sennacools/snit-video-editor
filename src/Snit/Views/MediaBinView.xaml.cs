@@ -1,4 +1,4 @@
-﻿using System.Windows;
+using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
@@ -61,17 +61,30 @@ public partial class MediaBinView : UserControl
 
     // ---- The title tile in the Text tab ----
 
-    private void TitleTile_MouseDown(object sender, MouseButtonEventArgs e) => pressPoint = e.GetPosition(TitleTile);
+    private void TitleTile_MouseDown(object sender, MouseButtonEventArgs e)
+    {
+        pressPoint = e.GetPosition((IInputElement)sender);
+        if (e.ClickCount == 2 && sender is FrameworkElement { Tag: TitleTemplate template } && DataContext is MainViewModel main)
+        {
+            main.Timeline.AddTitleAtPlayhead(template.Style);
+            pressPoint = null;
+            e.Handled = true;
+        }
+    }
 
     private void TitleTile_MouseMove(object sender, MouseEventArgs e)
     {
-        if (e.LeftButton != MouseButtonState.Pressed || pressPoint is not Point start) return;
-        Point now = e.GetPosition(TitleTile);
+        if (e.LeftButton != MouseButtonState.Pressed || pressPoint is not Point start
+            || sender is not FrameworkElement { Tag: TitleTemplate template } tile) return;
+        Point now = e.GetPosition(tile);
         if (Math.Abs(now.X - start.X) < SystemParameters.MinimumHorizontalDragDistance &&
             Math.Abs(now.Y - start.Y) < SystemParameters.MinimumVerticalDragDistance)
             return;
         pressPoint = null;
-        DragDrop.DoDragDrop(TitleTile, new DataObject(TimelineCanvas.MediaDragFormat, MediaItem.Title), DragDropEffects.Copy);
+        // The timeline drops a normal title; the template's look is picked up when it is created.
+        if (DataContext is MainViewModel main) main.Timeline.NextTitleStyle = template.Style;
+        try { DragDrop.DoDragDrop(tile, new DataObject(TimelineCanvas.MediaDragFormat, MediaItem.Title), DragDropEffects.Copy); }
+        finally { if (DataContext is MainViewModel m) m.Timeline.NextTitleStyle = null; }
     }
 
     // ---- Effect tiles in the Effects tab: drag onto a clip, or double-click for the selected clip ----

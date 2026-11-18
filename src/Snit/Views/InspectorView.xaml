@@ -81,6 +81,8 @@
                         <StackPanel Orientation="Horizontal" Margin="86,10,0,0">
                             <CheckBox Content="Bold" IsChecked="{Binding Inspector.TitleBold}"/>
                             <CheckBox Content="Shadow" Margin="16,0,0,0" IsChecked="{Binding Inspector.TitleShadow}"/>
+                            <CheckBox Content="Box" Margin="16,0,0,0" IsChecked="{Binding Inspector.TitleBox}"
+                                      ToolTip="A see-through dark box behind the text"/>
                         </StackPanel>
 
                         <controls:PropertySlider Label="Position X" Minimum="0" Maximum="100" Margin="0,10,0,3"

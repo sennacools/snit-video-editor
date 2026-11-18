@@ -63,6 +63,7 @@ public static class ProjectFile
         public string Color { get; init; } = "#FFFFFF";
         public bool Bold { get; init; } = true;
         public bool Shadow { get; init; } = true;
+        public string Box { get; init; } = "";
         public double X { get; init; } = 0.5;
         public double Y { get; init; } = 0.5;
     }
@@ -96,7 +97,7 @@ public static class ProjectFile
                         Title = c.Title is { } t ? new TitleData
                         {
                             Text = t.Text, FontFamily = t.FontFamily, FontSize = t.FontSize, Color = t.Color,
-                            Bold = t.Bold, Shadow = t.Shadow, X = t.X, Y = t.Y,
+                            Bold = t.Bold, Shadow = t.Shadow, Box = t.Box, X = t.X, Y = t.Y,
                         } : null,
                     }).ToList(), t.VolumeDb, t.Pan, t.IsSolo)).ToList(),
             project.InPoint, project.OutPoint, project.Markers);
@@ -182,7 +183,7 @@ public static class ProjectFile
                     Title = c.Title is { } d ? new TitleStyle
                     {
                         Text = d.Text, FontFamily = d.FontFamily, FontSize = d.FontSize, Color = d.Color,
-                        Bold = d.Bold, Shadow = d.Shadow, X = d.X, Y = d.Y,
+                        Bold = d.Bold, Shadow = d.Shadow, Box = d.Box ?? "", X = d.X, Y = d.Y,
                     } : null,
                 });
             }

@@ -202,7 +202,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
     /// <summary>Titles are drawn once (per text and look) and then remembered.</summary>
     private ImageSource TitlePicture(TitleStyle s)
     {
-        string key = $"{s.Text}|{s.FontFamily}|{s.FontSize}|{s.Color}|{s.Bold}|{s.Shadow}|{s.X}|{s.Y}";
+        string key = $"{s.Text}|{s.FontFamily}|{s.FontSize}|{s.Color}|{s.Bold}|{s.Shadow}|{s.Box}|{s.X}|{s.Y}";
         if (!titlePictures.TryGetValue(key, out ImageSource? picture))
         {
             if (titlePictures.Count > 50) titlePictures.Clear();

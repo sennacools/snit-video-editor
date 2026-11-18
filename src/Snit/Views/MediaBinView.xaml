@@ -146,6 +146,39 @@
                     </Grid>
                 </DockPanel>
 
+                <!-- ===== Text tab: titles ===== -->
+                <StackPanel Margin="10,12,10,0">
+                    <StackPanel.Style>
+                        <Style TargetType="StackPanel">
+                            <Setter Property="Visibility" Value="Collapsed"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding Bin.ActiveTab}" Value="Text">
+                                    <Setter Property="Visibility" Value="Visible"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </StackPanel.Style>
+
+                    <!-- Drag this onto the timeline, like a media file. -->
+                    <Border x:Name="TitleTile" Width="124" HorizontalAlignment="Left" Cursor="Hand"
+                            Background="Transparent" ToolTip="Drag onto a video track"
+                            PreviewMouseLeftButtonDown="TitleTile_MouseDown" PreviewMouseMove="TitleTile_MouseMove">
+                        <StackPanel>
+                            <Border CornerRadius="5" Height="70" Background="{StaticResource TextClipBrush}"
+                                    BorderBrush="{StaticResource TextClipBorderBrush}" BorderThickness="1">
+                                <TextBlock Text="Aa" FontSize="26" FontWeight="Bold" Foreground="White"
+                                           HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Border>
+                            <TextBlock Text="Title" Margin="1,5,1,0" FontSize="11" Foreground="{StaticResource SecondaryTextBrush}"/>
+                        </StackPanel>
+                    </Border>
+
+                    <Button Content="Add title at playhead" HorizontalAlignment="Left" Margin="0,14,0,0"
+                            Command="{Binding Timeline.AddTitleAtPlayheadCommand}"/>
+                    <TextBlock Style="{StaticResource MutedText}" TextWrapping="Wrap" Margin="0,12,0,0"
+                               Text="Or pick the T tool under the timeline and click on a video track. Change the text, font and colour in the inspector on the right."/>
+                </StackPanel>
+
                 <!-- ===== Other tabs (not built yet) ===== -->
                 <TextBlock Text="Coming in a later phase."
                            HorizontalAlignment="Center" VerticalAlignment="Center">
@@ -153,6 +186,9 @@
                         <Style TargetType="TextBlock" BasedOn="{StaticResource MutedText}">
                             <Style.Triggers>
                                 <DataTrigger Binding="{Binding Bin.ActiveTab}" Value="Media">
+                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding Bin.ActiveTab}" Value="Text">
                                     <Setter Property="Visibility" Value="Collapsed"/>
                                 </DataTrigger>
                             </Style.Triggers>

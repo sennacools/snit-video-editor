@@ -96,8 +96,43 @@ public partial class MainViewModel : ObservableObject, IDisposable
         return engine;
     }
 
+    // ===================== Titles on the preview =====================
+
+    /// <summary>The titles shown on top of the preview picture right now (bottom track first).</summary>
+    public System.Collections.ObjectModel.ObservableCollection<ImageSource> TitleOverlays { get; } = [];
+
+    private readonly Dictionary<string, ImageSource> titlePictures = [];
+    private string shownTitlesKey = "";
+
+    /// <summary>Works out which titles are visible at the playhead and shows them.</summary>
+    private void UpdateTitleOverlays()
+    {
+        var titles = PreviewPlan.TitlesAt(project, Timeline.PlayheadFrame);
+        var keys = titles.Select(c => TitleKey(c.Title!)).ToList();
+        string allKeys = string.Join("|", keys);
+        if (allKeys == shownTitlesKey) return; // nothing changed (most frames during playback)
+        shownTitlesKey = allKeys;
+
+        TitleOverlays.Clear();
+        for (int i = 0; i < titles.Count; i++)
+        {
+            if (!titlePictures.TryGetValue(keys[i], out ImageSource? picture))
+            {
+                // Drawn once at the project size, then remembered.
+                if (titlePictures.Count > 50) titlePictures.Clear();
+                picture = TitleRenderer.Render(titles[i].Title!, project.Settings.Width, project.Settings.Height);
+                titlePictures[keys[i]] = picture;
+            }
+            TitleOverlays.Add(picture);
+        }
+    }
+
+    private static string TitleKey(TitleStyle s)
+        => $"{s.Text}\u0001{s.FontFamily}\u0001{s.FontSize}\u0001{s.Color}\u0001{s.Bold}\u0001{s.Shadow}\u0001{s.X}\u0001{s.Y}";
+
     private void OnTimelineContentChanged()
     {
+        UpdateTitleOverlays();
         IsDirty = true;
         ExportCommand.NotifyCanExecuteChanged(); // Export is only possible with something on the timeline
         playback.UpdateTimeline(project);
@@ -106,7 +141,9 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
     private void OnTimelinePropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (e.PropertyName != nameof(TimelineViewModel.PlayheadFrame) || positionFromPlayer) return;
+        if (e.PropertyName != nameof(TimelineViewModel.PlayheadFrame)) return;
+        UpdateTitleOverlays(); // also during playback
+        if (positionFromPlayer) return;
 
         // You moved the playhead (ruler, arrow keys...): show that frame, or keep playing from there.
         if (IsPlaying) playback.Play(Timeline.PlayheadFrame);
@@ -255,6 +292,9 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
         IsDirty = false;
         ExportCommand.NotifyCanExecuteChanged();
+        titlePictures.Clear();
+        shownTitlesKey = "\u0002"; // force a refresh
+        UpdateTitleOverlays();
         OnPropertyChanged(nameof(PreviewImage));
         OnPropertyChanged(nameof(PreviewQualityText));
         OnPropertyChanged(nameof(ProjectName));

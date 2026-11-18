@@ -121,8 +121,9 @@ public class TimelineCanvas : FrameworkElement
         bool isAudio = track.Kind == TrackKind.Audio;
         bool selected = tl.Selection.Contains(clip);
 
-        Brush fill = Res(isAudio ? "AudioClipBrush" : "VideoClipBrush");
-        Brush border = selected ? Res("SelectedClipBorderBrush") : Res(isAudio ? "AudioClipBorderBrush" : "VideoClipBorderBrush");
+        string kind = isAudio ? "AudioClip" : clip.IsTitle ? "TextClip" : "VideoClip"; // green, purple or blue
+        Brush fill = Res(kind + "Brush");
+        Brush border = selected ? Res("SelectedClipBorderBrush") : Res(kind + "BorderBrush");
         var pen = new Pen(border, selected ? 2 : 1);
 
         dc.DrawRoundedRectangle(fill, null, rect, 5, 5);
@@ -316,6 +317,16 @@ public class TimelineCanvas : FrameworkElement
                 tl.ZoomAt(p.X, zoomOut ? 1 / 1.5 : 1.5);
                 return;
 
+            case "Text":
+                // Click on a track to put a new title there (titles go on video tracks).
+                Track? textTrack = TrackAt(p.Y);
+                if (textTrack is not null)
+                {
+                    tl.AddMedia(MediaItem.Title, textTrack, tl.Snap(tl.FrameAt(p.X), [], out _));
+                    tl.ActiveTool = "Select"; // ready to move or trim the new title
+                }
+                return;
+
             case "Razor":
                 if (clipUsable)
                 {
@@ -324,7 +335,7 @@ public class TimelineCanvas : FrameworkElement
                 }
                 return;
 
-            default: // Select, Ripple (and Text until it exists)
+            default: // Select and Ripple
                 if (!clipUsable)
                 {
                     tl.ClearSelection();
@@ -436,6 +447,7 @@ public class TimelineCanvas : FrameworkElement
             "Hand" => Cursors.Hand,
             "Zoom" => Cursors.Cross,
             "Razor" => Cursors.Cross,
+            "Text" => Cursors.IBeam,
             _ => ClipAt(p) is Clip c && !tl.IsLocked(c) && EdgeAt(c, p.X) != 0 ? Cursors.SizeWE : Cursors.Arrow,
         };
     }
@@ -468,9 +480,10 @@ public class TimelineCanvas : FrameworkElement
         Track track = TrackAt(p.Y) ?? tl.Tracks[^1];
         // Put it on a track of the right kind.
         if (media.Kind == MediaKind.Audio && track.Kind != TrackKind.Audio) track = tl.Project.TrackByName("A1");
-        if (media.Kind != MediaKind.Audio && track.Kind != TrackKind.Video) track = tl.Project.TrackByName("V1");
+        if (media.Kind != MediaKind.Audio && track.Kind != TrackKind.Video)
+            track = tl.Project.TrackByName(media.Kind == MediaKind.Text ? "V2" : "V1");
 
-        long length = media.Kind == MediaKind.Image
+        long length = media.Kind is MediaKind.Image or MediaKind.Text
             ? (long)Math.Round(Services.MediaImporter.DefaultImageSeconds * tl.Fps)
             : media.LengthInFrames(tl.Fps);
         long start = tl.Snap(tl.FrameAt(p.X), [], out _);

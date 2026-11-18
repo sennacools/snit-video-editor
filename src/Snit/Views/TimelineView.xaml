@@ -78,9 +78,9 @@
                               Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}"
                               StrokeThickness="1.4"/>
                     </RadioButton>
-                    <RadioButton Style="{StaticResource ToolButton}" ToolTip="Text (not built yet)" IsEnabled="False"
+                    <RadioButton Style="{StaticResource ToolButton}" ToolTip="Text: click on a video track to add a title (T)"
                                  IsChecked="{Binding Timeline.ActiveTool, Converter={StaticResource EqualsConverter}, ConverterParameter=Text}">
-                        <TextBlock Text="T" FontFamily="{StaticResource UiFont}" FontSize="16" FontWeight="Bold" Opacity="0.45"/>
+                        <TextBlock Text="T" FontFamily="{StaticResource UiFont}" FontSize="16" FontWeight="Bold"/>
                     </RadioButton>
                     <RadioButton Style="{StaticResource ToolButton}" Content="&#xE7C2;" ToolTip="Hand: drag to scroll the timeline (H)"
                                  IsChecked="{Binding Timeline.ActiveTool, Converter={StaticResource EqualsConverter}, ConverterParameter=Hand}"/>

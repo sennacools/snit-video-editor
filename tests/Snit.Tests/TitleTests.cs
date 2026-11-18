@@ -91,6 +91,36 @@ public class TitleTests(TestMedia media) : IClassFixture<TestMedia>
     }
 
     [Fact]
+    public async Task The_exported_picture_really_contains_the_title()
+    {
+        if (!media.Available) return;
+        var (project, tl) = NewTimeline();
+        tl.AddMedia(MediaItem.Title, project.TrackByName("V2"), 0);
+        var style = project.TrackByName("V2").Clips[0].Title!;
+        (style.Text, style.Color, style.FontSize, style.Shadow) = ("MMMM", "#FF0000", 400, false);
+
+        string output = Path.Combine(media.Folder, "red title.mp4");
+        var plan = ExportCommandBuilder.Build(project, new ExportSettings { OutputPath = output, Width = 320, Height = 180 });
+        await new Exporter().RunAsync(plan, null, CancellationToken.None);
+
+        // Take frame 10 as raw red-green-blue pixels and count clearly red ones.
+        var frame = await ProcessRunner.RunAsync(FFmpegLocator.Current.FfmpegPath!,
+            ["-v", "error", "-i", output, "-vf", "select=eq(n\\,10)", "-frames:v", "1", "-f", "rawvideo", "-pix_fmt", "rgb24", "pipe:1"]);
+        Assert.Equal(320 * 180 * 3, frame.Output.Length);
+
+        int red = 0, black = 0;
+        for (int i = 0; i < frame.Output.Length; i += 3)
+        {
+            byte r = frame.Output[i], g = frame.Output[i + 1], b = frame.Output[i + 2];
+            if (r > 180 && g < 70 && b < 70) red++;
+            if (r < 30 && g < 30 && b < 30) black++;
+        }
+        int total = 320 * 180;
+        Assert.True(red > total / 20, $"Only {red} red pixels: the title is missing.");
+        Assert.True(black > total / 5, $"Only {black} black pixels: the see-through part isn't see-through.");
+    }
+
+    [Fact]
     public async Task A_title_ends_up_in_the_exported_video()
     {
         if (!media.Available) return;

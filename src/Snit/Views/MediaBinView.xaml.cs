@@ -52,6 +52,21 @@ public partial class MediaBinView : UserControl
         }
     }
 
+    // ---- The title tile in the Text tab ----
+
+    private void TitleTile_MouseDown(object sender, MouseButtonEventArgs e) => pressPoint = e.GetPosition(TitleTile);
+
+    private void TitleTile_MouseMove(object sender, MouseEventArgs e)
+    {
+        if (e.LeftButton != MouseButtonState.Pressed || pressPoint is not Point start) return;
+        Point now = e.GetPosition(TitleTile);
+        if (Math.Abs(now.X - start.X) < SystemParameters.MinimumHorizontalDragDistance &&
+            Math.Abs(now.Y - start.Y) < SystemParameters.MinimumVerticalDragDistance)
+            return;
+        pressPoint = null;
+        DragDrop.DoDragDrop(TitleTile, new DataObject(TimelineCanvas.MediaDragFormat, MediaItem.Title), DragDropEffects.Copy);
+    }
+
     // ---- Files dropped from Explorer ----
 
     private void MediaTab_DragOver(object sender, DragEventArgs e)

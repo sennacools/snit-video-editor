@@ -98,20 +98,34 @@
                                                  Value="{Binding Inspector.TitleY}" Format="{}{0:0}%"/>
                     </StackPanel>
 
-                    <!-- Transform and colour come in phase 5, so they are greyed out for now. -->
-                    <StackPanel IsEnabled="False">
-                        <TextBlock Text="TRANSFORM" Style="{StaticResource SectionTitle}"/>
-                        <controls:PropertySlider Label="Scale" Minimum="0" Maximum="400" Value="100" Format="{}{0:0}%"/>
-                        <controls:PropertySlider Label="Rotation" Minimum="-180" Maximum="180" Value="0" Format="{}{0:0}°"/>
-                        <controls:PropertySlider Label="Opacity" Minimum="0" Maximum="100" Value="100" Format="{}{0:0}%"/>
-                        <controls:PropertySlider Label="Position X" Minimum="-1920" Maximum="1920" Value="0" Format="{}{0:0} px"/>
-                        <controls:PropertySlider Label="Position Y" Minimum="-1080" Maximum="1080" Value="0" Format="{}{0:0} px"/>
+                    <!-- ===== Picture: transform and colour of the selected clip (or of the video linked to a selected sound) ===== -->
+                    <StackPanel IsEnabled="{Binding Inspector.HasVisual}">
+                        <DockPanel>
+                            <Button DockPanel.Dock="Right" Content="Reset" Padding="8,2" FontSize="11" VerticalAlignment="Bottom"
+                                    Margin="0,0,0,4" Command="{Binding Inspector.ResetLookCommand}"
+                                    ToolTip="Put size, rotation, opacity, position and colour back to normal"/>
+                            <TextBlock Text="TRANSFORM" Style="{StaticResource SectionTitle}"/>
+                        </DockPanel>
+                        <controls:PropertySlider Label="Scale" Minimum="0" Maximum="400"
+                                                 Value="{Binding Inspector.Scale}" Format="{}{0:0}%"/>
+                        <controls:PropertySlider Label="Rotation" Minimum="-180" Maximum="180"
+                                                 Value="{Binding Inspector.Rotation}" Format="{}{0:0}°"/>
+                        <controls:PropertySlider Label="Opacity" Minimum="0" Maximum="100"
+                                                 Value="{Binding Inspector.Opacity}" Format="{}{0:0}%"/>
+                        <controls:PropertySlider Label="Position X" Minimum="-1920" Maximum="1920"
+                                                 Value="{Binding Inspector.PositionX}" Format="{}{0:0} px"/>
+                        <controls:PropertySlider Label="Position Y" Minimum="-1080" Maximum="1080"
+                                                 Value="{Binding Inspector.PositionY}" Format="{}{0:0} px"/>
 
                         <TextBlock Text="COLOR" Style="{StaticResource SectionTitle}"/>
-                        <controls:PropertySlider Label="Exposure" Minimum="-3" Maximum="3" Value="0" Format="{}{0:+0.0;-0.0;0.0}"/>
-                        <controls:PropertySlider Label="Contrast" Minimum="-100" Maximum="100" Value="0" Format="{}{0:+0;-0;0}"/>
-                        <controls:PropertySlider Label="Saturation" Minimum="0" Maximum="200" Value="100" Format="{}{0:0}%"/>
-                        <controls:PropertySlider Label="Temperature" Minimum="-100" Maximum="100" Value="0" Format="{}{0:+0;-0;0}"/>
+                        <controls:PropertySlider Label="Exposure" Minimum="-3" Maximum="3"
+                                                 Value="{Binding Inspector.Exposure}" Format="{}{0:+0.0;-0.0;0.0}"/>
+                        <controls:PropertySlider Label="Contrast" Minimum="-100" Maximum="100"
+                                                 Value="{Binding Inspector.Contrast}" Format="{}{0:+0;-0;0}"/>
+                        <controls:PropertySlider Label="Saturation" Minimum="0" Maximum="200"
+                                                 Value="{Binding Inspector.Saturation}" Format="{}{0:0}%"/>
+                        <controls:PropertySlider Label="Temperature" Minimum="-100" Maximum="100"
+                                                 Value="{Binding Inspector.Temperature}" Format="{}{0:+0;-0;0}"/>
                     </StackPanel>
 
                     <!-- Sound of the selected clip (or of the sound linked to a selected video). -->
@@ -125,10 +139,14 @@
                                                  Value="{Binding Inspector.FadeOutSeconds}" Format="{}{0:0.0} s"/>
                     </StackPanel>
 
-                    <StackPanel IsEnabled="False">
+                    <!-- ===== Speed (video and sound; the linked partner follows) ===== -->
+                    <StackPanel IsEnabled="{Binding Inspector.HasSpeed}">
                         <TextBlock Text="SPEED" Style="{StaticResource SectionTitle}"/>
-                        <controls:PropertySlider Label="Speed" Minimum="10" Maximum="400" Value="100" Format="{}{0:0}%"/>
-                        <CheckBox Content="Reverse" Margin="0,8,0,0"/>
+                        <controls:PropertySlider Label="Speed" Minimum="10" Maximum="400"
+                                                 Value="{Binding Inspector.SpeedPercent}" Format="{}{0:0}%"/>
+                        <CheckBox Content="Reverse" Margin="0,8,0,0" IsChecked="{Binding Inspector.Reverse}"/>
+                        <TextBlock Style="{StaticResource MutedText}" TextWrapping="Wrap" Margin="0,8,0,0"
+                                   Text="The clip gets shorter or longer; the clips after it slide along. Reversed clips play choppy in the preview but export smoothly."/>
                     </StackPanel>
                 </StackPanel>
             </ScrollViewer>

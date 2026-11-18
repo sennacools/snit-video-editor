@@ -155,6 +155,68 @@ public partial class InspectorViewModel : ObservableObject
         if (TitleClip is Clip clip) Change(clip, property, c => change(c.Title!));
     }
 
+    // ===================== Transform and colour =====================
+
+    /// <summary>The clip whose picture we change: the selected clip, or the video linked to a selected sound.</summary>
+    private Clip? VisualClip
+    {
+        get
+        {
+            Clip? selected = timeline.SelectedClip;
+            if (selected is null) return null;
+            return timeline.Project.LinkedGroup(selected)
+                .FirstOrDefault(c => timeline.Project.TrackOf(c).Kind == TrackKind.Video);
+        }
+    }
+
+    public bool HasVisual => VisualClip is not null;
+
+    private ClipLook Look => VisualClip?.Look ?? ClipLook.Default;
+
+    private void ChangeLook(string property, Func<ClipLook, ClipLook> change)
+    {
+        if (VisualClip is Clip clip) Change(clip, property, c => c.Look = change(c.Look));
+    }
+
+    public double Scale { get => Look.Scale; set => ChangeLook(nameof(Scale), l => l with { Scale = Math.Round(value) }); }
+    public double Rotation { get => Look.Rotation; set => ChangeLook(nameof(Rotation), l => l with { Rotation = Math.Round(value) }); }
+    public double Opacity { get => Look.Opacity; set => ChangeLook(nameof(Opacity), l => l with { Opacity = Math.Round(value) }); }
+    public double PositionX { get => Look.PositionX; set => ChangeLook(nameof(PositionX), l => l with { PositionX = Math.Round(value) }); }
+    public double PositionY { get => Look.PositionY; set => ChangeLook(nameof(PositionY), l => l with { PositionY = Math.Round(value) }); }
+
+    public double Exposure { get => Look.Exposure; set => ChangeLook(nameof(Exposure), l => l with { Exposure = Math.Round(value, 1) }); }
+    public double Contrast { get => Look.Contrast; set => ChangeLook(nameof(Contrast), l => l with { Contrast = Math.Round(value) }); }
+    public double Saturation { get => Look.Saturation; set => ChangeLook(nameof(Saturation), l => l with { Saturation = Math.Round(value) }); }
+    public double Temperature { get => Look.Temperature; set => ChangeLook(nameof(Temperature), l => l with { Temperature = Math.Round(value) }); }
+
+    /// <summary>The frame size, for the position sliders' range.</summary>
+    public double FrameWidth => timeline.Project.Settings.Width;
+    public double FrameHeight => timeline.Project.Settings.Height;
+
+    /// <summary>Puts every transform and colour setting back to normal (one undo step).</summary>
+    [CommunityToolkit.Mvvm.Input.RelayCommand]
+    private void ResetLook()
+    {
+        if (VisualClip is Clip clip && clip.Look != ClipLook.Default)
+            Change(clip, nameof(ResetLook) + Guid.NewGuid(), c => c.Look = ClipLook.Default);
+    }
+
+    // ===================== Speed =====================
+
+    public bool HasSpeed => timeline.SelectedClip is Clip c && TimelineViewModel.CanChangeSpeed(c);
+
+    public double SpeedPercent
+    {
+        get => timeline.SelectedClip?.SpeedPercent ?? 100;
+        set { if (timeline.SelectedClip is Clip c) timeline.SetSpeed(c, value); }
+    }
+
+    public bool Reverse
+    {
+        get => timeline.SelectedClip?.Reverse ?? false;
+        set { if (timeline.SelectedClip is Clip c) timeline.SetReverse(c, value); }
+    }
+
     // ===================== Shared =====================
 
     private void Change(Clip clip, string property, Action<Clip> change)

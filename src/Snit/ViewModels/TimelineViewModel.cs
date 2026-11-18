@@ -557,6 +557,64 @@ public partial class TimelineViewModel : ObservableObject
         dragAnchor = null;
     }
 
+    // ===================== Speed and reverse =====================
+
+    private sealed record SpeedChange(int Version, Guid ClipId, List<(Clip Clip, long Length, double Speed)> Group, List<Original> Later);
+    private SpeedChange? speedChange;
+
+    public const double MinSpeedPercent = 10, MaxSpeedPercent = 400;
+
+    /// <summary>Speed can be changed for video and sound, not for pictures and titles.</summary>
+    public static bool CanChangeSpeed(Clip clip) => clip.Media.Kind is MediaKind.Video or MediaKind.Audio;
+
+    /// <summary>
+    /// Changes the speed of a clip and its linked partner. The clip keeps showing the same part
+    /// of the file, so it gets shorter (faster) or longer (slower), and the clips after it on the
+    /// same tracks slide along. Dragging the slider counts as one undo step.
+    /// </summary>
+    public void SetSpeed(Clip clip, double percent)
+    {
+        if (!CanChangeSpeed(clip) || IsLocked(clip)) return;
+        percent = Math.Clamp(Math.Round(percent), MinSpeedPercent, MaxSpeedPercent);
+
+        // A new change (not the next step of the same slider drag): remember how things were.
+        if (speedChange is null || speedChange.ClipId != clip.Id || speedChange.Version != EditVersion)
+        {
+            SaveUndoPoint();
+            var group = Project.LinkedGroup(clip).Where(c => !IsLocked(c) && CanChangeSpeed(c)).ToList();
+            var later = new List<Original>();
+            foreach (Clip c in group)
+            {
+                Track track = Project.TrackOf(c);
+                later.AddRange(track.Clips.Where(o => !group.Contains(o) && o.Start >= c.End)
+                    .Select(o => new Original(o, o.Start, o.In, o.Length, track)));
+            }
+            speedChange = new SpeedChange(EditVersion, clip.Id, group.Select(c => (c, c.Length, c.Speed)).ToList(), later);
+        }
+
+        long delta = 0;
+        foreach (var (c, length, speed) in speedChange.Group)
+        {
+            c.SpeedPercent = percent;
+            c.Length = Math.Max(1, (long)Math.Round(length * speed / (percent / 100)));
+            if (c == clip) delta = c.Length - length;
+        }
+        foreach (var o in speedChange.Later) o.Clip.Start = o.Start + delta;
+
+        OnPropertyChanged(nameof(SelectedClip));
+        NotifyContentChanged();
+    }
+
+    /// <summary>Plays a clip (and its linked partner) backwards, or forwards again.</summary>
+    public void SetReverse(Clip clip, bool reverse)
+    {
+        if (!CanChangeSpeed(clip) || IsLocked(clip) || clip.Reverse == reverse) return;
+        SaveUndoPoint();
+        foreach (Clip c in Project.LinkedGroup(clip).Where(c => !IsLocked(c) && CanChangeSpeed(c)))
+            c.Reverse = reverse;
+        NotifyContentChanged();
+    }
+
     // ===================== Trimming clip edges (drag) =====================
 
     private bool trimLeft;

@@ -43,6 +43,17 @@ public class AudioPreviewTests(TestMedia media) : IClassFixture<TestMedia>
     }
 
     [Fact]
+    public async Task Sped_up_and_reversed_sound_still_plays()
+    {
+        if (!media.Available) return;
+        // 2 s tone at 200%, reversed: 1 s on the timeline (30 frames), using all 60 source frames.
+        var levels = await ListenAsync(new AudioPiece(0, 30, media.Tone, 0, Speed: 2, Reverse: true, SourceLength: 60),
+            TimeSpan.FromSeconds(0.8));
+        if (levels.Count == 0) return;
+        Assert.InRange(levels.Max(), 0.07f, 0.11f); // same loudness: atempo changes speed, not volume
+    }
+
+    [Fact]
     public async Task Minus_six_dB_halves_what_the_meter_shows()
     {
         if (!media.Available) return;

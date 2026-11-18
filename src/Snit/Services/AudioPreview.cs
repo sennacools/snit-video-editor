@@ -70,13 +70,15 @@ public sealed class AudioPreview : IDisposable
             double skip = Math.Max(0, from - start);           // part of the clip already behind us
             int delayMs = (int)Math.Round(Math.Max(0, start - from) * 1000);
 
-            // Read the whole clip and apply volume and fades first, then skip the part that is
-            // already behind us; that way a fade sounds right even when you start halfway through it.
+            // Read the whole clip, change its speed (same recipe as the export), apply volume and
+            // fades, and only then skip the part that is already behind us. That way a fade sounds
+            // right even when you start halfway through it.
+            string speed = VideoFilters.AudioSpeed(p.Speed, p.Reverse);
             string effects = AudioFilters.ClipEffects(p.VolumeDb, p.FadeInSeconds, p.FadeOutSeconds, length);
             string trim = skip > 0 ? $",atrim=start={ProcessRunner.Num(skip)},asetpts=PTS-STARTPTS" : "";
 
-            args.AddRange(["-ss", ProcessRunner.Num(p.SourceStart / fps), "-t", ProcessRunner.Num(length), "-i", p.Path]);
-            filters.Add($"[{i}:a:0]aresample={SampleRate},aformat=channel_layouts=stereo{effects}{trim},adelay={delayMs}:all=1[a{i}]");
+            args.AddRange(["-ss", ProcessRunner.Num(p.SourceStart / fps), "-t", ProcessRunner.Num(p.SourceFrames / fps), "-i", p.Path]);
+            filters.Add($"[{i}:a:0]aresample={SampleRate},aformat=channel_layouts=stereo{speed}{effects}{trim},adelay={delayMs}:all=1[a{i}]");
         }
 
         string inputs = string.Concat(Enumerable.Range(0, audible.Count).Select(i => $"[a{i}]"));

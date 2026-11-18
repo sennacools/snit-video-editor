@@ -141,6 +141,8 @@ public class TimelineCanvas : FrameworkElement
             DrawWaveform(dc, tl, clip, rect);
 
         string name = clip.Media.IsOffline ? clip.Name + "  (file missing)" : clip.Name;
+        if (clip.Reverse || Math.Abs(clip.SpeedPercent - 100) > 0.01)
+            name += $"   {(clip.Reverse ? "◀ " : "")}{clip.SpeedPercent:0.#}%"; // e.g. "◀ 50%"
         var label = Text(name, Res("TextBrush"), 11, dpi, FontWeights.SemiBold);
         dc.DrawText(label, new Point(textLeft, rect.Top + 5));
 
@@ -178,11 +180,16 @@ public class TimelineCanvas : FrameworkElement
             for (double x = Math.Floor(left); x < right; x++)
             {
                 double secondsIntoClip = (x - rect.Left) / pps;
-                double sourceSeconds = clip.In / fps + secondsIntoClip;
+                // Which part of the sound file this pixel shows (sped up = more file per pixel;
+                // reversed = from the end of the used part backwards).
+                double span = clip.Speed / pps;
+                double sourceSeconds = clip.Reverse
+                    ? (clip.In + clip.SourceLength) / fps - (secondsIntoClip * clip.Speed) - span
+                    : clip.In / fps + secondsIntoClip * clip.Speed;
 
                 // Loudest point within this pixel.
                 int from = (int)(sourceSeconds / perPoint);
-                int to = Math.Max(from + 1, (int)((sourceSeconds + 1 / pps) / perPoint));
+                int to = Math.Max(from + 1, (int)((sourceSeconds + span) / perPoint));
                 float peak = 0;
                 for (int i = Math.Max(0, from); i < to && i < points.Length; i++)
                     if (points[i] > peak) peak = points[i];

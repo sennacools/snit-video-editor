@@ -34,6 +34,7 @@ public partial class InspectorViewModel : ObservableObject
     {
         OnPropertyChanged(string.Empty);
         Keys?.Refresh();
+        SyncEffects();
     }
 
     public string ClipName => timeline.SelectedClipName;
@@ -300,6 +301,53 @@ public partial class InspectorViewModel : ObservableObject
                 c.Look = ClipLook.Default;
                 c.Keyframes = Core.Keyframes.None;
             });
+    }
+
+    // ===================== Effects =====================
+
+    /// <summary>The selected clip's effects, top to bottom (only for clips on video tracks).</summary>
+    public System.Collections.ObjectModel.ObservableCollection<EffectRowViewModel> EffectRows { get; } = [];
+
+    public bool HasEffects => EffectRows.Count > 0;
+
+    /// <summary>
+    /// Keeps the effect rows in step with the clip. The rows are only rebuilt when effects are added,
+    /// removed or reordered; otherwise they just re-read their values, so a slider you are dragging
+    /// is never replaced under your mouse.
+    /// </summary>
+    private void SyncEffects()
+    {
+        Clip? clip = VisualClip;
+        var effects = clip?.Effects ?? [];
+        if (!EffectRows.Select(r => r.Id).SequenceEqual(effects.Select(e => e.Id)))
+        {
+            EffectRows.Clear();
+            foreach (ClipEffect effect in effects)
+            {
+                Guid id = effect.Id;
+                EffectRows.Add(new EffectRowViewModel(effect,
+                    current: () => VisualClip?.Effects.FirstOrDefault(e => e.Id == id),
+                    change: (what, update) => ChangeEffect(id, what, update),
+                    remove: () => RemoveEffect(id)));
+            }
+            OnPropertyChanged(nameof(HasEffects));
+        }
+        else
+        {
+            foreach (var row in EffectRows) row.Refresh();
+        }
+    }
+
+    private void ChangeEffect(Guid id, string what, Func<ClipEffect, ClipEffect> update)
+    {
+        if (VisualClip is not Clip clip) return;
+        Change(clip, $"effect:{id}:{what}", c => c.Effects = c.Effects.Select(e => e.Id == id ? update(e) : e).ToList());
+    }
+
+    private void RemoveEffect(Guid id)
+    {
+        if (VisualClip is not Clip clip) return;
+        Change(clip, "remove-effect" + Guid.NewGuid(), c => c.Effects = c.Effects.Where(e => e.Id != id).ToList());
     }
 
     // ===================== Transitions =====================

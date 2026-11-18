@@ -172,6 +172,59 @@
                                                  Value="{Binding Inspector.Temperature}" Format="{}{0:+0;-0;0}"/>
                     </StackPanel>
 
+                    <!-- ===== Effects of the selected clip, top to bottom ===== -->
+                    <StackPanel Visibility="{Binding Inspector.HasEffects, Converter={StaticResource BoolToVisibility}}">
+                        <TextBlock Text="EFFECTS" Style="{StaticResource SectionTitle}"/>
+                        <ItemsControl ItemsSource="{Binding Inspector.EffectRows}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Margin="0,0,0,8" Padding="10,6,6,8" CornerRadius="6" Background="{StaticResource InputBrush}"
+                                            BorderBrush="{StaticResource BorderBrush}" BorderThickness="1">
+                                        <StackPanel>
+                                            <DockPanel>
+                                                <Button DockPanel.Dock="Right" Style="{StaticResource IconButton}" Content="&#xE711;" FontSize="10"
+                                                        Width="24" Height="24" Command="{Binding RemoveCommand}" ToolTip="Remove this effect"/>
+                                                <CheckBox IsChecked="{Binding Enabled}" ToolTip="Switch the effect on or off">
+                                                    <TextBlock Text="{Binding Name}" FontWeight="SemiBold" Foreground="{StaticResource TextBrush}"/>
+                                                </CheckBox>
+                                            </DockPanel>
+                                            <ItemsControl ItemsSource="{Binding Parameters}" Margin="0,4,0,0">
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <Grid>
+                                                            <controls:PropertySlider Label="{Binding Label}" Minimum="{Binding Minimum}" Maximum="{Binding Maximum}"
+                                                                                     Value="{Binding Value}" Format="{Binding Format}"
+                                                                                     Visibility="{Binding IsSlider, Converter={StaticResource BoolToVisibility}}"/>
+                                                            <CheckBox Content="{Binding Label}" IsChecked="{Binding IsOn}" Margin="0,4"
+                                                                      Visibility="{Binding IsSwitch, Converter={StaticResource BoolToVisibility}}"/>
+                                                        </Grid>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                            <!-- Green screen: which colour to remove -->
+                                            <StackPanel Orientation="Horizontal" Margin="0,6,0,0"
+                                                        Visibility="{Binding NeedsColor, Converter={StaticResource BoolToVisibility}}">
+                                                <TextBlock Text="Colour" Width="86" VerticalAlignment="Center" Foreground="{StaticResource SecondaryTextBrush}"/>
+                                                <Button Width="20" Height="20" Padding="0" Margin="0,0,5,0" Background="#00FF00" ToolTip="Green"
+                                                        Command="{Binding SetColorCommand}" CommandParameter="#00FF00"/>
+                                                <Button Width="20" Height="20" Padding="0" Margin="0,0,8,0" Background="#0000FF" ToolTip="Blue"
+                                                        Command="{Binding SetColorCommand}" CommandParameter="#0000FF"/>
+                                                <TextBox Text="{Binding Color, UpdateSourceTrigger=LostFocus}" Width="84"
+                                                         FontFamily="{StaticResource MonoFont}" ToolTip="Any colour as #RRGGBB"/>
+                                            </StackPanel>
+                                            <!-- LUT: which file -->
+                                            <DockPanel Margin="0,6,0,0" Visibility="{Binding NeedsFile, Converter={StaticResource BoolToVisibility}}">
+                                                <Button DockPanel.Dock="Right" Content="Choose…" Command="{Binding ChooseFileCommand}"/>
+                                                <TextBlock Text="{Binding FileName}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"
+                                                           Foreground="{StaticResource SecondaryTextBrush}" Margin="0,0,8,0"/>
+                                            </DockPanel>
+                                        </StackPanel>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+
                     <!-- Sound of the selected clip (or of the sound linked to a selected video). -->
                     <StackPanel IsEnabled="{Binding Inspector.HasAudio}">
                         <TextBlock Text="AUDIO" Style="{StaticResource SectionTitle}"/>

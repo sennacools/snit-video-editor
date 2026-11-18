@@ -21,6 +21,10 @@ public class TimelineCanvas : FrameworkElement
     private const double EdgeGrabWidth = 6; // how close to an edge counts as "grab the edge"
     public const string MediaDragFormat = "Snit.MediaItem";
     public const string TransitionDragFormat = "Snit.Transition";
+    public const string EffectDragFormat = "Snit.Effect";
+
+    /// <summary>The clip an effect is being dragged over (drawn highlighted).</summary>
+    private Clip? effectTarget;
 
     public static readonly DependencyProperty TimelineProperty = DependencyProperty.Register(
         nameof(Timeline), typeof(TimelineViewModel), typeof(TimelineCanvas),
@@ -121,6 +125,13 @@ public class TimelineCanvas : FrameworkElement
 
         DrawDropGhost(dc, tl, dpi);
         DrawTransitionGhost(dc, tl);
+        if (effectTarget is Clip highlighted)
+        {
+            int row = tl.Tracks.IndexOf(tl.Project.TrackOf(highlighted));
+            double x1 = tl.FrameToX(highlighted.Start), x2 = tl.FrameToX(highlighted.End);
+            dc.DrawRoundedRectangle(Res("AccentTintBrush"), new Pen(Res("AccentBrush"), 2),
+                new Rect(x1, row * TrackHeight + ClipInset, Math.Max(4, x2 - x1), TrackHeight - ClipInset * 2), 5, 5);
+        }
         DrawRazorLine(dc, tl);
 
         if (box is Rect selectionBox)
@@ -161,6 +172,7 @@ public class TimelineCanvas : FrameworkElement
             DrawWaveform(dc, tl, clip, rect);
 
         string name = clip.Media.IsOffline ? clip.Name + "  (file missing)" : clip.Name;
+        if (clip.Effects.Count > 0) name += "   fx";
         if (clip.Reverse || Math.Abs(clip.SpeedPercent - 100) > 0.01)
             name += $"   {(clip.Reverse ? "◀ " : "")}{clip.SpeedPercent:0.#}%"; // e.g. "◀ 50%"
         var label = Text(name, Res("TextBrush"), 11, dpi, FontWeights.SemiBold);
@@ -655,6 +667,16 @@ public class TimelineCanvas : FrameworkElement
     {
         base.OnDragOver(e);
         var tl = Timeline;
+        if (tl is not null && e.Data.GetData(EffectDragFormat) is string)
+        {
+            // An effect: goes on the video clip under the mouse.
+            Clip? target = ClipAt(e.GetPosition(this));
+            effectTarget = target is not null && !tl.IsLocked(target) && tl.Project.TrackOf(target).Kind == TrackKind.Video ? target : null;
+            e.Effects = effectTarget is null ? DragDropEffects.None : DragDropEffects.Copy;
+            e.Handled = true;
+            InvalidateVisual();
+            return;
+        }
         if (tl is not null && e.Data.GetData(TransitionDragFormat) is TransitionKind)
         {
             // A transition: goes on the start or end of the clip under the mouse (whichever half).
@@ -698,12 +720,22 @@ public class TimelineCanvas : FrameworkElement
         base.OnDragLeave(e);
         dropGhost = null;
         transitionGhost = null;
+        effectTarget = null;
         InvalidateVisual();
     }
 
     protected override void OnDrop(DragEventArgs e)
     {
         base.OnDrop(e);
+        if (effectTarget is Clip target && Timeline is { } timelineVm && e.Data.GetData(EffectDragFormat) is string effectKind)
+        {
+            effectTarget = null;
+            timelineVm.AddEffect(target, effectKind);
+            Focus();
+            InvalidateVisual();
+            e.Handled = true;
+            return;
+        }
         if (transitionGhost is { } t && Timeline is { } timeline && e.Data.GetData(TransitionDragFormat) is TransitionKind kind)
         {
             transitionGhost = null;

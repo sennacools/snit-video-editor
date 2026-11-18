@@ -180,6 +180,39 @@
                                Text="Or pick the T tool under the timeline and click on a video track. Change the text, font and colour in the inspector on the right."/>
                 </StackPanel>
 
+                <!-- ===== Effects tab ===== -->
+                <DockPanel Margin="10,12,10,0">
+                    <DockPanel.Style>
+                        <Style TargetType="DockPanel">
+                            <Setter Property="Visibility" Value="Collapsed"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding Bin.ActiveTab}" Value="Effects">
+                                    <Setter Property="Visibility" Value="Visible"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </DockPanel.Style>
+                    <TextBlock DockPanel.Dock="Bottom" Style="{StaticResource MutedText}" TextWrapping="Wrap" Margin="0,10,0,10"
+                               Text="Drag an effect onto a clip on a video track, or double-click it to add it to the selected clip. Change or remove it in the inspector."/>
+                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                        <ItemsControl ItemsSource="{x:Static core:EffectCatalog.All}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Tag="{Binding Kind}" Margin="0,0,0,6" Padding="10,8" CornerRadius="5" Cursor="Hand"
+                                            Background="{StaticResource ControlBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1"
+                                            PreviewMouseLeftButtonDown="EffectTile_MouseDown" PreviewMouseMove="EffectTile_MouseMove"
+                                            MouseLeftButtonUp="EffectTile_MouseUp">
+                                        <StackPanel>
+                                            <TextBlock Text="{Binding Name}" FontWeight="SemiBold" Foreground="{StaticResource TextBrush}"/>
+                                            <TextBlock Text="{Binding Description}" Style="{StaticResource MutedText}" TextWrapping="Wrap" Margin="0,2,0,0"/>
+                                        </StackPanel>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+                </DockPanel>
+
                 <!-- ===== Transitions tab ===== -->
                 <StackPanel Margin="10,12,10,0">
                     <StackPanel.Style>
@@ -247,6 +280,9 @@
                                     <Setter Property="Visibility" Value="Collapsed"/>
                                 </DataTrigger>
                                 <DataTrigger Binding="{Binding Bin.ActiveTab}" Value="Transitions">
+                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding Bin.ActiveTab}" Value="Effects">
                                     <Setter Property="Visibility" Value="Collapsed"/>
                                 </DataTrigger>
                             </Style.Triggers>

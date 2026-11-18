@@ -74,6 +74,32 @@ public partial class MediaBinView : UserControl
         DragDrop.DoDragDrop(TitleTile, new DataObject(TimelineCanvas.MediaDragFormat, MediaItem.Title), DragDropEffects.Copy);
     }
 
+    // ---- Effect tiles in the Effects tab: drag onto a clip, or double-click for the selected clip ----
+
+    private void EffectTile_MouseDown(object sender, MouseButtonEventArgs e)
+    {
+        pressPoint = e.GetPosition((IInputElement)sender);
+        if (e.ClickCount == 2 && sender is FrameworkElement { Tag: string kind } && DataContext is MainViewModel main
+            && main.Timeline.SelectedClip is Clip clip)
+        {
+            main.Timeline.AddEffect(clip, kind);
+            e.Handled = true;
+        }
+    }
+
+    private void EffectTile_MouseUp(object sender, MouseButtonEventArgs e) => pressPoint = null;
+
+    private void EffectTile_MouseMove(object sender, MouseEventArgs e)
+    {
+        if (e.LeftButton != MouseButtonState.Pressed || pressPoint is not Point start || sender is not FrameworkElement { Tag: string kind } tile) return;
+        Point now = e.GetPosition(tile);
+        if (Math.Abs(now.X - start.X) < SystemParameters.MinimumHorizontalDragDistance &&
+            Math.Abs(now.Y - start.Y) < SystemParameters.MinimumVerticalDragDistance)
+            return;
+        pressPoint = null;
+        DragDrop.DoDragDrop(tile, new DataObject(TimelineCanvas.EffectDragFormat, kind), DragDropEffects.Copy);
+    }
+
     // ---- Transition tiles in the Transitions tab ----
 
     private void TransitionTile_MouseDown(object sender, MouseButtonEventArgs e) => pressPoint = e.GetPosition((IInputElement)sender);

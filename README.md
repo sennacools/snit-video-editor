@@ -34,6 +34,8 @@ It's built with C#, WPF and FFmpeg.
 - **Speed** from 10% to 400% and **reverse**, for video and its sound together
 - **Transitions**: cross-dissolve and dip to black (from the Transitions tab, or Ctrl+D at a cut);
   the clip's sound cross-fades along. A dissolve uses footage just beyond the cut if the files have it
+- **Effects** (Effects tab): blur, sharpen, crop, vignette, flip, green screen (chroma key) and
+  colour LUTs (.cube). Drag one onto a clip, then change, switch off or remove it in the inspector
 - **In and out marks** (I and O) to export just a part of the timeline
 - **Undo / redo** for every timeline edit (one slider drag or one bit of typing is one step)
 - **Projects** saved as `.snit` files (plain JSON; media files are referenced, never copied),

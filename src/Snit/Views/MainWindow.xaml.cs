@@ -97,6 +97,8 @@ public partial class MainWindow : Window
             (Key.I, false, false) => tl.SetInPoint,
             (Key.O, false, false) => tl.SetOutPoint,
             (Key.X, true, true) => tl.ClearInOut,
+            (Key.M, false, true) => tl.GoToNextMarker,
+            (Key.M, true, true) => tl.GoToPreviousMarker,
             _ => null,
         };
         if (action is not null)
@@ -130,6 +132,7 @@ public partial class MainWindow : Window
             (Key.S, true, true) => viewModel.SaveAsCommand,
             (Key.I, true, false) => viewModel.Bin.ImportCommand,
             (Key.M, true, false) => viewModel.ExportCommand,
+            (Key.M, false, false) => tl.AddMarkerCommand,
             (Key.OemPlus or Key.Add, false, _) => tl.ZoomInCommand,
             (Key.OemMinus or Key.Subtract, false, _) => tl.ZoomOutCommand,
             _ => null,
@@ -144,6 +147,8 @@ public partial class MainWindow : Window
     private void PreviousEdit_Click(object sender, RoutedEventArgs e) => viewModel.Timeline.GoToPreviousEdit();
     private void NextEdit_Click(object sender, RoutedEventArgs e) => viewModel.Timeline.GoToNextEdit();
     private void MarkIn_Click(object sender, RoutedEventArgs e) => viewModel.Timeline.SetInPoint();
+    private void NextMarker_Click(object sender, RoutedEventArgs e) => viewModel.Timeline.GoToNextMarker();
+    private void PreviousMarker_Click(object sender, RoutedEventArgs e) => viewModel.Timeline.GoToPreviousMarker();
     private void MarkOut_Click(object sender, RoutedEventArgs e) => viewModel.Timeline.SetOutPoint();
     private void ClearInOut_Click(object sender, RoutedEventArgs e) => viewModel.Timeline.ClearInOut();
 

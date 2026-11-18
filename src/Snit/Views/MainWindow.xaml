@@ -88,6 +88,10 @@
                         <MenuItem Header="Previous cut" InputGestureText="↑" Click="PreviousEdit_Click"/>
                         <MenuItem Header="Next cut" InputGestureText="↓" Click="NextEdit_Click"/>
                         <Separator/>
+                        <MenuItem Header="Add marker" InputGestureText="M" Command="{Binding Timeline.AddMarkerCommand}"/>
+                        <MenuItem Header="Next marker" InputGestureText="Shift+M" Click="NextMarker_Click"/>
+                        <MenuItem Header="Previous marker" InputGestureText="Ctrl+Shift+M" Click="PreviousMarker_Click"/>
+                        <Separator/>
                         <MenuItem Header="Mark in" InputGestureText="I" Click="MarkIn_Click"/>
                         <MenuItem Header="Mark out" InputGestureText="O" Click="MarkOut_Click"/>
                         <MenuItem Header="Clear in and out" InputGestureText="Ctrl+Shift+X" Click="ClearInOut_Click"/>

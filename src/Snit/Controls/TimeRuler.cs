@@ -59,6 +59,13 @@ public class TimeRuler : FrameworkElement
         nameof(RangeBrush), typeof(Brush), typeof(TimeRuler),
         new FrameworkPropertyMetadata(Brushes.SteelBlue, FrameworkPropertyMetadataOptions.AffectsRender));
 
+    /// <summary>Markers to draw, with the frame rate to place them.</summary>
+    public static readonly DependencyProperty MarkersProperty = DependencyProperty.Register(
+        nameof(Markers), typeof(IReadOnlyList<Marker>), typeof(TimeRuler),
+        new FrameworkPropertyMetadata(null, FrameworkPropertyMetadataOptions.AffectsRender));
+
+    public IReadOnlyList<Marker>? Markers { get => (IReadOnlyList<Marker>?)GetValue(MarkersProperty); set => SetValue(MarkersProperty, value); }
+
     public double InSeconds { get => (double)GetValue(InSecondsProperty); set => SetValue(InSecondsProperty, value); }
     public double OutSeconds { get => (double)GetValue(OutSecondsProperty); set => SetValue(OutSecondsProperty, value); }
     public Brush RangeBrush { get => (Brush)GetValue(RangeBrushProperty); set => SetValue(RangeBrushProperty, value); }
@@ -124,6 +131,7 @@ public class TimeRuler : FrameworkElement
         dc.DrawLine(pen, new Point(0, height - 0.5), new Point(width, height - 0.5));
 
         DrawInOut(dc, height, pps);
+        DrawMarkers(dc, pps);
 
         // Playhead marker.
         double px = Math.Round(PlayheadSeconds * pps - ScrollX) + 0.5;
@@ -132,6 +140,27 @@ public class TimeRuler : FrameworkElement
             dc.PushTransform(new TranslateTransform(px, height - 15));
             dc.DrawGeometry(PlayheadBrush, null, Marker);
             dc.Pop();
+        }
+    }
+
+    /// <summary>A small flag for each marker, in the marker's colour, with its name when there is room.</summary>
+    private void DrawMarkers(DrawingContext dc, double pps)
+    {
+        if (Markers is null || FramesPerSecond <= 0) return;
+        double dpi = VisualTreeHelper.GetDpi(this).PixelsPerDip;
+        foreach (Marker m in Markers)
+        {
+            double x = Math.Round(m.Frame / FramesPerSecond * pps - ScrollX) + 0.5;
+            if (x < -8 || x > ActualWidth + 8) continue;
+            Brush brush = new SolidColorBrush(Services.TitleRenderer.ParseColor(m.Color));
+            var flag = Geometry.Parse(FormattableString.Invariant($"M{x - 5},1 L{x + 5},1 L{x + 5},8 L{x},13 L{x - 5},8 Z"));
+            dc.DrawGeometry(brush, null, flag);
+            if (pps * 2 > 60) // zoomed in far enough for the name to fit
+            {
+                var text = new FormattedText(m.Name, CultureInfo.CurrentCulture, FlowDirection.LeftToRight,
+                    new Typeface("Segoe UI"), 9, brush, dpi);
+                dc.DrawText(text, new Point(x + 7, 1));
+            }
         }
     }
 

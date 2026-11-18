@@ -137,6 +137,8 @@
                                 FramesPerSecond="{Binding Timeline.Fps, Mode=OneWay}"
                                 ScrollX="{Binding Timeline.ScrollX}"
                                 PlayheadSeconds="{Binding Timeline.PlayheadSeconds}"
+                                Markers="{Binding Timeline.Markers, Mode=OneWay}"
+                                MouseRightButtonUp="Ruler_RightClick"
                                 InSeconds="{Binding Timeline.InSeconds, Mode=OneWay}"
                                 OutSeconds="{Binding Timeline.OutSeconds, Mode=OneWay}"
                                 RangeBrush="{StaticResource AccentBrush}"

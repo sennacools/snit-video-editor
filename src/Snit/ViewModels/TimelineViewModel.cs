@@ -114,6 +114,61 @@ public partial class TimelineViewModel : ObservableObject
     public void GoToNextEdit()
         => PlayheadFrame = EditPoints.Where(f => f > PlayheadFrame).DefaultIfEmpty(PlayheadFrame).Min();
 
+    // ===================== Markers =====================
+
+    public IReadOnlyList<Marker> Markers => Project.Markers;
+
+    /// <summary>M key: a marker at the playhead (named "Marker 1", "Marker 2"…).</summary>
+    [RelayCommand]
+    private void AddMarker()
+    {
+        if (Project.Markers.Any(m => m.Frame == PlayheadFrame)) return;
+        SaveUndoPoint();
+        Project.Markers = [.. Project.Markers, new Marker(PlayheadFrame, $"Marker {Project.Markers.Count + 1}")];
+        Project.Markers.Sort((a, b) => a.Frame.CompareTo(b.Frame));
+        MarkersChanged();
+    }
+
+    /// <summary>The marker within a few pixels of a spot on the ruler, or null.</summary>
+    public Marker? MarkerNear(double x) => Project.Markers
+        .Where(m => Math.Abs(FrameToX(m.Frame) - x) <= 6)
+        .OrderBy(m => Math.Abs(FrameToX(m.Frame) - x))
+        .FirstOrDefault();
+
+    public void RenameMarker(Marker marker, string name)
+    {
+        if (string.IsNullOrWhiteSpace(name) || !Project.Markers.Contains(marker)) return;
+        SaveUndoPoint();
+        Project.Markers = Project.Markers.Select(m => m == marker ? m with { Name = name.Trim() } : m).ToList();
+        MarkersChanged();
+    }
+
+    public void DeleteMarker(Marker marker)
+    {
+        if (!Project.Markers.Contains(marker)) return;
+        SaveUndoPoint();
+        Project.Markers = Project.Markers.Where(m => m != marker).ToList();
+        MarkersChanged();
+    }
+
+    /// <summary>Shift+M: to the next marker.</summary>
+    public void GoToNextMarker()
+    {
+        if (Project.Markers.FirstOrDefault(m => m.Frame > PlayheadFrame) is Marker m) PlayheadFrame = m.Frame;
+    }
+
+    /// <summary>Ctrl+Shift+M: to the previous marker.</summary>
+    public void GoToPreviousMarker()
+    {
+        if (Project.Markers.LastOrDefault(m => m.Frame < PlayheadFrame) is Marker m) PlayheadFrame = m.Frame;
+    }
+
+    private void MarkersChanged()
+    {
+        OnPropertyChanged(nameof(Markers));
+        NotifyContentChanged(); // saved with the project
+    }
+
     // ===================== In and out points =====================
 
     public long? InPoint => Project.InPoint;
@@ -254,7 +309,8 @@ public partial class TimelineViewModel : ObservableObject
         var targets = Project.AllClips.Where(c => !ignore.Contains(c))
             .SelectMany(c => new[] { c.Start, c.End })
             .Append(0)
-            .Append(PlayheadFrame);
+            .Append(PlayheadFrame)
+            .Concat(Project.Markers.Select(m => m.Frame));
 
         long best = frame;
         foreach (long t in targets)
@@ -317,14 +373,15 @@ public partial class TimelineViewModel : ObservableObject
     // Before each edit we save a copy of every track's clips. Undo puts the copy back.
 
     private sealed record TrackState(Track Track, List<Clip> Clips);
-    private sealed record Snapshot(List<TrackState> Tracks, HashSet<Guid> Selected);
+    private sealed record Snapshot(List<TrackState> Tracks, HashSet<Guid> Selected, List<Marker> Markers);
 
     private readonly Stack<Snapshot> undoStack = new();
     private readonly Stack<Snapshot> redoStack = new();
 
     private Snapshot TakeSnapshot() => new(
         Project.Tracks.Select(t => new TrackState(t, t.Clips.Select(c => c.Copy()).ToList())).ToList(),
-        Selection.Select(c => c.Id).ToHashSet());
+        Selection.Select(c => c.Id).ToHashSet(),
+        Project.Markers.ToList());
 
     private void RestoreSnapshot(Snapshot s)
     {
@@ -342,6 +399,8 @@ public partial class TimelineViewModel : ObservableObject
         }
         foreach (var t in s.Tracks)
             t.Track.Clips = t.Clips.Select(c => c.Copy()).ToList();
+        Project.Markers = s.Markers.ToList();
+        OnPropertyChanged(nameof(Markers));
         Selection.Clear();
         Selection.UnionWith(Project.AllClips.Where(c => s.Selected.Contains(c.Id)));
         SelectionChanged();

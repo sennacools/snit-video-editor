@@ -248,6 +248,9 @@ public partial class Track : ObservableObject
     private bool isLocked;
 }
 
+/// <summary>A marker on the timeline (M key): a remembered moment with a name.</summary>
+public sealed record Marker(long Frame, string Name, string Color = "#E8C547");
+
 /// <summary>Everything in one .snit file.</summary>
 public sealed class Project
 {
@@ -316,6 +319,9 @@ public sealed class Project
     /// <summary>The "in" and "out" marks (I and O keys): a part of the timeline, e.g. to export only that.</summary>
     public long? InPoint { get; set; }
     public long? OutPoint { get; set; }
+
+    /// <summary>Markers on the timeline, in time order.</summary>
+    public List<Marker> Markers { get; set; } = [];
 
     /// <summary>Where the project is saved, or null if it never was.</summary>
     public string? FilePath { get; set; }

@@ -73,7 +73,93 @@ public partial class InspectorViewModel : ObservableObject
 
     private void ChangeAudio(string property, Action<Clip> change)
     {
-        if (AudioClip is not Clip clip || timeline.IsLocked(clip)) return;
+        if (AudioClip is Clip clip) Change(clip, property, change);
+    }
+
+    // ===================== Text (titles) =====================
+
+    private Clip? TitleClip => timeline.SelectedClip is { IsTitle: true } c ? c : null;
+    private TitleStyle? Style => TitleClip?.Title;
+
+    public bool HasTitle => TitleClip is not null;
+
+    public string TitleText
+    {
+        get => Style?.Text ?? "";
+        set => ChangeTitle(nameof(TitleText), s => s.Text = value);
+    }
+
+    public string TitleFont
+    {
+        get => Style?.FontFamily ?? "";
+        set { if (!string.IsNullOrEmpty(value)) ChangeTitle(nameof(TitleFont), s => s.FontFamily = value); }
+    }
+
+    public double TitleSize
+    {
+        get => Style?.FontSize ?? 96;
+        set => ChangeTitle(nameof(TitleSize), s => s.FontSize = Math.Round(value));
+    }
+
+    public string TitleColor
+    {
+        get => Style?.Color ?? "#FFFFFF";
+        set
+        {
+            string color = value.Trim();
+            if (!color.StartsWith('#')) color = "#" + color;
+            if (Services.TitleRenderer.IsColor(color)) ChangeTitle(nameof(TitleColor), s => s.Color = color.ToUpperInvariant());
+            else OnPropertyChanged(); // not a colour: put the old value back in the box
+        }
+    }
+
+    public bool TitleBold
+    {
+        get => Style?.Bold ?? true;
+        set => ChangeTitle(nameof(TitleBold), s => s.Bold = value);
+    }
+
+    public bool TitleShadow
+    {
+        get => Style?.Shadow ?? true;
+        set => ChangeTitle(nameof(TitleShadow), s => s.Shadow = value);
+    }
+
+    /// <summary>Position in percent: 0 = left edge, 50 = centre, 100 = right edge.</summary>
+    public double TitleX
+    {
+        get => (Style?.X ?? 0.5) * 100;
+        set => ChangeTitle(nameof(TitleX), s => s.X = Math.Round(value) / 100);
+    }
+
+    /// <summary>Position in percent: 0 = top, 50 = middle, 100 = bottom.</summary>
+    public double TitleY
+    {
+        get => (Style?.Y ?? 0.5) * 100;
+        set => ChangeTitle(nameof(TitleY), s => s.Y = Math.Round(value) / 100);
+    }
+
+    /// <summary>All fonts installed on this computer, A to Z.</summary>
+    public IReadOnlyList<string> Fonts { get; } = System.Windows.Media.Fonts.SystemFontFamilies
+        .Select(f => f.Source).Distinct().Order(StringComparer.OrdinalIgnoreCase).ToList();
+
+    /// <summary>Quick colour choices (the app's own colours plus black and white).</summary>
+    public IReadOnlyList<string> ColorChoices { get; } =
+        ["#FFFFFF", "#0E0F11", "#E8C547", "#FF7A45", "#5B9BFF", "#3FB57A", "#E5484D", "#B388FF"];
+
+    [CommunityToolkit.Mvvm.Input.RelayCommand]
+    private void SetTitleColor(string color) => TitleColor = color;
+
+    private void ChangeTitle(string property, Action<TitleStyle> change)
+    {
+        if (TitleClip is Clip clip) Change(clip, property, c => change(c.Title!));
+    }
+
+    // ===================== Shared =====================
+
+    private void Change(Clip clip, string property, Action<Clip> change)
+    {
+        if (timeline.IsLocked(clip)) return;
 
         // Dragging a slider sends many small changes: only the first one makes an undo step,
         // unless something else was edited (or undone) in between.

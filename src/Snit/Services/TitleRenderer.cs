@@ -67,6 +67,10 @@ public static class TitleRenderer
         return bitmap;
     }
 
+    /// <summary>True for colour codes like "#FFCC00" (also "#FC0" and "#80FFCC00" with see-through).</summary>
+    public static bool IsColor(string text)
+        => System.Text.RegularExpressions.Regex.IsMatch(text, "^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$");
+
     /// <summary>"#FFCC00" → a colour. Anything unreadable becomes white.</summary>
     public static Color ParseColor(string text)
     {

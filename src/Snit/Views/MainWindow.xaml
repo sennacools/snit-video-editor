@@ -74,8 +74,8 @@
                     </MenuItem>
                     <MenuItem Header="_Clip">
                         <MenuItem Header="Split at playhead" InputGestureText="Ctrl+K" Command="{Binding Timeline.SplitAtPlayheadCommand}"/>
-                        <Separator/>
-                        <MenuItem Header="Speed / reverse…" IsEnabled="False"/>
+                        <MenuItem Header="Cross dissolve at playhead cut" InputGestureText="Ctrl+D" Command="{Binding Timeline.AddDissolveAtPlayheadCommand}"/>
+
                     </MenuItem>
                     <MenuItem Header="_Timeline">
                         <MenuItem Header="Play / pause" InputGestureText="Space" Command="{Binding PlayPauseCommand}"/>

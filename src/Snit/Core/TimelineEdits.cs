@@ -78,10 +78,12 @@ public static class TimelineEdits
                 right.LinkId = null; // the right piece has no partner of its own
                 MoveEdges(right, end - right.Start, 0);
                 right.FadeInSeconds = 0;
+                right.TransitionIn = null;
                 track.Clips.Add(right);
 
                 MoveEdges(other, 0, start - other.End);
                 other.FadeOutSeconds = 0;
+                other.TransitionOut = null;
             }
             else if (!startsInside)
             {
@@ -107,9 +109,12 @@ public static class TimelineEdits
         MoveEdges(right, frame - right.Start, 0); // right piece: everything after the cut
         MoveEdges(clip, 0, frame - clip.End);     // left piece: everything before it
 
-        // The fade-in stays at the very start and the fade-out at the very end, not at the cut.
+        // The fade-in (and start transition) stays at the very start, the fade-out (and end
+        // transition) at the very end, not at the cut.
         clip.FadeOutSeconds = 0;
+        clip.TransitionOut = null;
         right.FadeInSeconds = 0;
+        right.TransitionIn = null;
         track.Clips.Add(right);
         return right;
     }

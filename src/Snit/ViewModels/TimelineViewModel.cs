@@ -615,6 +615,51 @@ public partial class TimelineViewModel : ObservableObject
         dragAnchor = null;
     }
 
+    // ===================== Transitions =====================
+
+    /// <summary>
+    /// Puts a transition at the start or end of a clip (and its linked partner), or removes it
+    /// (kind = null). At a cut, a transition on the end of the first clip is stored on the start
+    /// of the next clip instead, so a cut only ever has one transition.
+    /// </summary>
+    public void SetTransition(Clip clip, bool atStart, TransitionKind? kind, long frames, bool saveUndo = true)
+    {
+        if (IsLocked(clip)) return;
+        if (!atStart && NextClipAtCut(clip) is Clip next)
+        {
+            clip = next;
+            atStart = true;
+        }
+
+        if (saveUndo) SaveUndoPoint();
+        Transition? transition = kind is TransitionKind k ? new Transition(k, Math.Clamp(frames, 1, clip.Length)) : null;
+        foreach (Clip c in Project.LinkedGroup(clip).Where(c => !IsLocked(c)))
+        {
+            if (atStart) c.TransitionIn = transition;
+            else c.TransitionOut = transition;
+        }
+        NotifyContentChanged();
+    }
+
+    /// <summary>The clip that starts exactly where this one ends, on the same track (a cut), or null.</summary>
+    public Clip? NextClipAtCut(Clip clip) => Project.TrackOf(clip).Clips.FirstOrDefault(c => c != clip && c.Start == clip.End);
+
+    /// <summary>The clip that ends exactly where this one starts, on the same track, or null.</summary>
+    public Clip? PreviousClipAtCut(Clip clip) => Project.TrackOf(clip).Clips.FirstOrDefault(c => c != clip && c.End == clip.Start);
+
+    /// <summary>Ctrl+D: a cross-dissolve at the cut (on a video track) nearest to the playhead, within one second.</summary>
+    [RelayCommand]
+    private void AddDissolveAtPlayhead()
+    {
+        long reach = (long)Math.Round(Fps);
+        Clip? best = Project.Tracks.Where(t => t.Kind == TrackKind.Video && !t.IsLocked)
+            .SelectMany(t => t.Clips)
+            .Where(c => PreviousClipAtCut(c) is not null && Math.Abs(c.Start - PlayheadFrame) <= reach)
+            .OrderBy(c => Math.Abs(c.Start - PlayheadFrame))
+            .FirstOrDefault();
+        if (best is not null) SetTransition(best, atStart: true, TransitionKind.CrossDissolve, TransitionPlan.DefaultFrames);
+    }
+
     // ===================== Speed and reverse =====================
 
     private sealed record SpeedChange(int Version, Guid ClipId, List<(Clip Clip, long Length, double Speed)> Group, List<Original> Later);

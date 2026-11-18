@@ -201,6 +201,68 @@ public partial class InspectorViewModel : ObservableObject
             Change(clip, nameof(ResetLook) + Guid.NewGuid(), c => c.Look = ClipLook.Default);
     }
 
+    // ===================== Transitions =====================
+
+    /// <summary>The choices in the transition dropdowns. Null = no transition.</summary>
+    public IReadOnlyList<Choice<TransitionKind?>> TransitionChoices { get; } =
+    [
+        new("None", null),
+        new("Cross dissolve", TransitionKind.CrossDissolve),
+        new("Dip to black", TransitionKind.DipToBlack),
+    ];
+
+    public bool HasClip => timeline.SelectedClip is not null;
+
+    /// <summary>The transition at the start of the selected clip.</summary>
+    private Transition? StartTransition => timeline.SelectedClip?.TransitionIn;
+
+    /// <summary>The transition at the end: at a cut it is stored on the next clip's start.</summary>
+    private Transition? EndTransition => timeline.SelectedClip is Clip c
+        ? (timeline.NextClipAtCut(c) is Clip next ? next.TransitionIn : c.TransitionOut)
+        : null;
+
+    public Choice<TransitionKind?> StartKind
+    {
+        get => TransitionChoices.First(t => t.Value == StartTransition?.Kind);
+        set => ChangeTransition(atStart: true, value.Value, (long)Math.Round(StartSeconds * timeline.Fps));
+    }
+
+    public double StartSeconds
+    {
+        get => (StartTransition?.Frames ?? TransitionPlan.DefaultFrames) / timeline.Fps;
+        set { if (StartTransition is { } t) ChangeTransition(atStart: true, t.Kind, (long)Math.Round(value * timeline.Fps)); }
+    }
+
+    public Choice<TransitionKind?> EndKind
+    {
+        get => TransitionChoices.First(t => t.Value == EndTransition?.Kind);
+        set => ChangeTransition(atStart: false, value.Value, (long)Math.Round(EndSeconds * timeline.Fps));
+    }
+
+    public double EndSeconds
+    {
+        get => (EndTransition?.Frames ?? TransitionPlan.DefaultFrames) / timeline.Fps;
+        set { if (EndTransition is { } t) ChangeTransition(atStart: false, t.Kind, (long)Math.Round(value * timeline.Fps)); }
+    }
+
+    /// <summary>A transition can be at most 4 seconds (and never longer than the clip).</summary>
+    public double TransitionMaximum => timeline.SelectedClip is Clip c ? Math.Max(0.1, Math.Min(4, c.Length / timeline.Fps)) : 4;
+
+    private void ChangeTransition(bool atStart, TransitionKind? kind, long frames)
+    {
+        if (timeline.SelectedClip is not Clip clip || timeline.IsLocked(clip)) return;
+        string property = (atStart ? "TransitionIn" : "TransitionOut") + clip.Id;
+        // One undo step per slider drag, like the other settings.
+        bool newStep = lastChange != property || lastChangeVersion != timeline.EditVersion;
+        if (newStep)
+        {
+            timeline.SaveUndoPoint();
+            lastChange = property;
+            lastChangeVersion = timeline.EditVersion;
+        }
+        timeline.SetTransition(clip, atStart, kind, Math.Max(1, frames), saveUndo: false);
+    }
+
     // ===================== Speed =====================
 
     public bool HasSpeed => timeline.SelectedClip is Clip c && TimelineViewModel.CanChangeSpeed(c);

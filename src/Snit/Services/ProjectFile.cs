@@ -46,6 +46,8 @@ public static class ProjectFile
         public ClipLook? Look { get; init; }
         public double Speed { get; init; } = 100; // older files have no speed: normal
         public bool Reverse { get; init; }
+        public Transition? TransitionIn { get; init; }
+        public Transition? TransitionOut { get; init; }
     }
 
     /// <summary>The text and look of a title clip (titles have no media file).</summary>
@@ -82,6 +84,7 @@ public static class ProjectFile
                         VolumeDb = c.VolumeDb, FadeIn = c.FadeInSeconds, FadeOut = c.FadeOutSeconds,
                         Look = c.Look == ClipLook.Default ? null : c.Look, // only written when changed
                         Speed = c.SpeedPercent, Reverse = c.Reverse,
+                        TransitionIn = c.TransitionIn, TransitionOut = c.TransitionOut,
                         Title = c.Title is { } t ? new TitleData
                         {
                             Text = t.Text, FontFamily = t.FontFamily, FontSize = t.FontSize, Color = t.Color,
@@ -159,6 +162,7 @@ public static class ProjectFile
                     VolumeDb = c.VolumeDb, FadeInSeconds = c.FadeIn, FadeOutSeconds = c.FadeOut,
                     Look = c.Look ?? ClipLook.Default,
                     SpeedPercent = c.Speed > 0 ? c.Speed : 100, Reverse = c.Reverse,
+                    TransitionIn = c.TransitionIn, TransitionOut = c.TransitionOut,
                     Title = c.Title is { } d ? new TitleStyle
                     {
                         Text = d.Text, FontFamily = d.FontFamily, FontSize = d.FontSize, Color = d.Color,

@@ -67,6 +67,22 @@ public partial class MediaBinView : UserControl
         DragDrop.DoDragDrop(TitleTile, new DataObject(TimelineCanvas.MediaDragFormat, MediaItem.Title), DragDropEffects.Copy);
     }
 
+    // ---- Transition tiles in the Transitions tab ----
+
+    private void TransitionTile_MouseDown(object sender, MouseButtonEventArgs e) => pressPoint = e.GetPosition((IInputElement)sender);
+
+    private void TransitionTile_MouseMove(object sender, MouseEventArgs e)
+    {
+        if (e.LeftButton != MouseButtonState.Pressed || pressPoint is not Point start || sender is not FrameworkElement tile) return;
+        Point now = e.GetPosition(tile);
+        if (Math.Abs(now.X - start.X) < SystemParameters.MinimumHorizontalDragDistance &&
+            Math.Abs(now.Y - start.Y) < SystemParameters.MinimumVerticalDragDistance)
+            return;
+        pressPoint = null;
+        var kind = Enum.Parse<TransitionKind>((string)tile.Tag);
+        DragDrop.DoDragDrop(tile, new DataObject(TimelineCanvas.TransitionDragFormat, kind), DragDropEffects.Copy);
+    }
+
     // ---- Files dropped from Explorer ----
 
     private void MediaTab_DragOver(object sender, DragEventArgs e)

@@ -114,6 +114,14 @@ public sealed class Clip
     /// <summary>Size, rotation, opacity, position and colour. Replaced as a whole (it never changes inside).</summary>
     public ClipLook Look { get; set; } = ClipLook.Default;
 
+    // ---- Transitions ----
+
+    /// <summary>A transition at the start of the clip (from the clip before it, or a fade-in).</summary>
+    public Transition? TransitionIn { get; set; }
+
+    /// <summary>A transition at the end of the clip (a fade-out; at a cut, the next clip's start transition wins).</summary>
+    public Transition? TransitionOut { get; set; }
+
     // ---- Speed ----
 
     /// <summary>100 = normal, 200 = twice as fast (half as long), 50 = slow motion.</summary>

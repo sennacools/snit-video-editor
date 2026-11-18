@@ -139,6 +139,35 @@
                                                  Value="{Binding Inspector.FadeOutSeconds}" Format="{}{0:0.0} s"/>
                     </StackPanel>
 
+                    <!-- ===== Transitions at the start and end of the selected clip ===== -->
+                    <StackPanel IsEnabled="{Binding Inspector.HasClip}">
+                        <TextBlock Text="TRANSITIONS" Style="{StaticResource SectionTitle}"/>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="86"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+                            <TextBlock Text="At start" Foreground="{StaticResource SecondaryTextBrush}" VerticalAlignment="Center"/>
+                            <ComboBox Grid.Column="1" ItemsSource="{Binding Inspector.TransitionChoices}" DisplayMemberPath="Label"
+                                      SelectedItem="{Binding Inspector.StartKind}"/>
+                            <controls:PropertySlider Grid.Row="1" Grid.ColumnSpan="2" Label="Length" Minimum="0.1"
+                                                     Maximum="{Binding Inspector.TransitionMaximum}"
+                                                     Value="{Binding Inspector.StartSeconds}" Format="{}{0:0.0} s" Margin="0,4,0,8"/>
+                            <TextBlock Grid.Row="2" Text="At end" Foreground="{StaticResource SecondaryTextBrush}" VerticalAlignment="Center"/>
+                            <ComboBox Grid.Row="2" Grid.Column="1" ItemsSource="{Binding Inspector.TransitionChoices}" DisplayMemberPath="Label"
+                                      SelectedItem="{Binding Inspector.EndKind}"/>
+                            <controls:PropertySlider Grid.Row="3" Grid.ColumnSpan="2" Label="Length" Minimum="0.1"
+                                                     Maximum="{Binding Inspector.TransitionMaximum}"
+                                                     Value="{Binding Inspector.EndSeconds}" Format="{}{0:0.0} s" Margin="0,4,0,0"/>
+                        </Grid>
+                    </StackPanel>
+
                     <!-- ===== Speed (video and sound; the linked partner follows) ===== -->
                     <StackPanel IsEnabled="{Binding Inspector.HasSpeed}">
                         <TextBlock Text="SPEED" Style="{StaticResource SectionTitle}"/>

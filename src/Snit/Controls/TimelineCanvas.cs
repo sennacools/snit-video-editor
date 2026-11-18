@@ -20,6 +20,7 @@ public class TimelineCanvas : FrameworkElement
     private const double ClipInset = 4;     // gap above and below a clip
     private const double EdgeGrabWidth = 6; // how close to an edge counts as "grab the edge"
     public const string MediaDragFormat = "Snit.MediaItem";
+    public const string TransitionDragFormat = "Snit.Transition";
 
     public static readonly DependencyProperty TimelineProperty = DependencyProperty.Register(
         nameof(Timeline), typeof(TimelineViewModel), typeof(TimelineCanvas),
@@ -103,7 +104,12 @@ public class TimelineCanvas : FrameworkElement
             dc.DrawText(hint, new Point(16, TrackHeight * 1 + (TrackHeight - hint.Height) / 2));
         }
 
+        for (int i = 0; i < tl.Tracks.Count; i++)
+            foreach (Clip clip in tl.Tracks[i].Clips)
+                DrawTransitions(dc, tl, clip, i * TrackHeight, dpi);
+
         DrawDropGhost(dc, tl, dpi);
+        DrawTransitionGhost(dc, tl);
         DrawRazorLine(dc, tl);
 
         if (tl.SnapLineFrame is long snap)
@@ -206,6 +212,60 @@ public class TimelineCanvas : FrameworkElement
         }
         geometry.Freeze();
         dc.DrawGeometry(null, new Pen(Res("WaveformBrush"), 1), geometry);
+    }
+
+    private static readonly Brush TransitionPattern = CreateTransitionPattern();
+
+    private static Brush CreateTransitionPattern()
+    {
+        var brush = new DrawingBrush(new GeometryDrawing(null, new Pen(new SolidColorBrush(Color.FromArgb(70, 255, 255, 255)), 1.5),
+            Geometry.Parse("M0,8 L8,0")))
+        {
+            TileMode = TileMode.Tile, Viewport = new Rect(0, 0, 8, 8), ViewportUnits = BrushMappingMode.Absolute,
+        };
+        brush.Freeze();
+        return brush;
+    }
+
+    /// <summary>
+    /// A striped band where a transition is: centred on a cut for a cross-dissolve between two
+    /// clips, otherwise at the start or end of the clip.
+    /// </summary>
+    private void DrawTransitions(DrawingContext dc, TimelineViewModel tl, Clip clip, double top, double dpi)
+    {
+        void Band(long from, long to, Transition t)
+        {
+            double x1 = tl.FrameToX(from), x2 = tl.FrameToX(to);
+            if (x2 < 0 || x1 > ActualWidth) return;
+            var rect = new Rect(x1, top + ClipInset, Math.Max(4, x2 - x1), TrackHeight - ClipInset * 2);
+            dc.DrawRoundedRectangle(new SolidColorBrush(Color.FromArgb(90, 0, 0, 0)), null, rect, 4, 4);
+            dc.DrawRoundedRectangle(TransitionPattern, new Pen(Brushes.White, 1), rect, 4, 4);
+            string label = t.Kind == TransitionKind.CrossDissolve ? "Dissolve" : "Dip";
+            var text = Text(label, Brushes.White, 10, dpi, FontWeights.SemiBold);
+            if (text.Width + 8 < rect.Width)
+                dc.DrawText(text, new Point(rect.Left + (rect.Width - text.Width) / 2, rect.Bottom - text.Height - 4));
+        }
+
+        if (clip.TransitionIn is Transition tin)
+        {
+            bool atCut = tl.PreviousClipAtCut(clip) is not null;
+            long half = tin.Frames / 2;
+            if (atCut) Band(clip.Start - half, clip.Start + (tin.Frames - half), tin);
+            else Band(clip.Start, clip.Start + tin.Frames, tin);
+        }
+        if (clip.TransitionOut is Transition tout && tl.NextClipAtCut(clip)?.TransitionIn is null)
+            Band(clip.End - tout.Frames, clip.End, tout);
+    }
+
+    private void DrawTransitionGhost(DrawingContext dc, TimelineViewModel tl)
+    {
+        if (transitionGhost is not { } g) return;
+        int index = tl.Tracks.ToList().IndexOf(tl.Project.TrackOf(g.Clip));
+        long frames = Math.Min(TransitionPlan.DefaultFrames, g.Clip.Length);
+        long from = g.AtStart ? g.Clip.Start : g.Clip.End - frames;
+        double x1 = tl.FrameToX(from), x2 = tl.FrameToX(from + frames);
+        var rect = new Rect(x1, index * TrackHeight + ClipInset, Math.Max(4, x2 - x1), TrackHeight - ClipInset * 2);
+        dc.DrawRoundedRectangle(Res("AccentTintBrush"), new Pen(Res("AccentBrush"), 1.5) { DashStyle = DashStyles.Dash }, rect, 4, 4);
     }
 
     private void DrawDropGhost(DrawingContext dc, TimelineViewModel tl, double dpi)
@@ -472,10 +532,26 @@ public class TimelineCanvas : FrameworkElement
     private sealed record DropGhost(MediaItem Media, Track Track, long Start, long Length);
     private DropGhost? dropGhost;
 
+    private sealed record TransitionGhost(Clip Clip, bool AtStart);
+    private TransitionGhost? transitionGhost;
+
     protected override void OnDragOver(DragEventArgs e)
     {
         base.OnDragOver(e);
         var tl = Timeline;
+        if (tl is not null && e.Data.GetData(TransitionDragFormat) is TransitionKind)
+        {
+            // A transition: goes on the start or end of the clip under the mouse (whichever half).
+            Point at = e.GetPosition(this);
+            Clip? target = ClipAt(at);
+            transitionGhost = target is not null && !tl.IsLocked(target)
+                ? new TransitionGhost(target, at.X < (tl.FrameToX(target.Start) + tl.FrameToX(target.End)) / 2)
+                : null;
+            e.Effects = transitionGhost is null ? DragDropEffects.None : DragDropEffects.Copy;
+            e.Handled = true;
+            InvalidateVisual();
+            return;
+        }
         if (tl is null || e.Data.GetData(MediaDragFormat) is not MediaItem media)
         {
             e.Effects = DragDropEffects.None;
@@ -505,12 +581,23 @@ public class TimelineCanvas : FrameworkElement
     {
         base.OnDragLeave(e);
         dropGhost = null;
+        transitionGhost = null;
         InvalidateVisual();
     }
 
     protected override void OnDrop(DragEventArgs e)
     {
         base.OnDrop(e);
+        if (transitionGhost is { } t && Timeline is { } timeline && e.Data.GetData(TransitionDragFormat) is TransitionKind kind)
+        {
+            transitionGhost = null;
+            timeline.SetTransition(t.Clip, t.AtStart, kind, TransitionPlan.DefaultFrames);
+            timeline.Select(t.Clip, add: false);
+            Focus();
+            InvalidateVisual();
+            e.Handled = true;
+            return;
+        }
         var ghost = dropGhost;
         dropGhost = null;
         if (ghost is not null && Timeline is { } tl)

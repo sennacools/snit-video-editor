@@ -70,9 +70,13 @@ public static class ExportCommandBuilder
 
         // Bottom track first, so higher tracks end up on top.
         var videoTracks = project.Tracks.Where(t => t.Kind == TrackKind.Video && !t.IsOff).Reverse();
-        foreach (Clip clip in wantVideo ? videoTracks.SelectMany(t => t.Clips.Where(InRange).OrderBy(c => c.Start)) : [])
+        // Clips as they really appear once transitions are applied (maybe a bit longer, with fades).
+        var videoClips = videoTracks.SelectMany(t => TransitionPlan.Expand(t, projectFps)).Where(r => InRange(r.Clip));
+        foreach (RenderClip rc in wantVideo ? videoClips : [])
         {
+            Clip clip = rc.Clip;
             bool isStill = clip.Media.Kind is MediaKind.Image or MediaKind.Text;
+            bool fadesThrough = rc.FadeInFrames > 0 || rc.FadeOutFrames > 0; // needs see-through edges
             if (clip.Title is TitleStyle title)
             {
                 workFolder ??= Directory.CreateTempSubdirectory("snit-export-").FullName;
@@ -95,7 +99,10 @@ public static class ExportCommandBuilder
             filters.Add(
                 $"[{input}:v:0]{speed.TrimStart(',')}{(speed.Length > 0 ? "," : "")}fps={fps},trim=duration={Sec(clip.Length)}," +
                 $"scale={w}:{h}:force_original_aspect_ratio=decrease,setsar=1" +
-                $"{VideoFilters.Color(clip.Look)}{VideoFilters.Transform(clip.Look, keepTransparency: isStill)}," +
+                $"{VideoFilters.Color(clip.Look)}" +
+                $"{VideoFilters.Fade(rc.BlackInFrames, rc.BlackOutFrames, clip.Length, projectFps, alpha: false)}" +
+                $"{VideoFilters.Transform(clip.Look, keepTransparency: isStill || fadesThrough)}" +
+                $"{VideoFilters.Fade(rc.FadeInFrames, rc.FadeOutFrames, clip.Length, projectFps, alpha: true)}," +
                 $"setpts=PTS-STARTPTS+{Sec(clip.Start)}/TB[{label}]");
 
             // 3. Lay it on top, centred and then moved by the clip's position (measured in the
@@ -122,16 +129,20 @@ public static class ExportCommandBuilder
 
         // ---- Audio ----
         var audioClips = project.Tracks.Where(t => t.Kind == TrackKind.Audio && !t.IsOff)
-            .SelectMany(t => t.Clips.Where(InRange).OrderBy(c => c.Start)).ToList();
+            .SelectMany(t => TransitionPlan.Expand(t, projectFps)).Where(r => InRange(r.Clip)).ToList();
         var audioLabels = new List<string>();
-        foreach (Clip clip in wantAudio ? audioClips : [])
+        foreach (RenderClip rc in wantAudio ? audioClips : [])
         {
+            Clip clip = rc.Clip;
             args.AddRange(["-ss", Sec(clip.In), "-t", Sec(clip.SourceLength), "-i", clip.Media.FilePath]);
             long delayMs = (long)Math.Round(clip.Start / projectFps * 1000);
             string label = $"a{input}";
             // Speed/reverse first (so fades are measured on the timeline), then volume and fades.
             string speed = VideoFilters.AudioSpeed(clip.Speed, clip.Reverse);
-            string effects = AudioFilters.ClipEffects(clip.VolumeDb, clip.FadeInSeconds, clip.FadeOutSeconds, clip.Length / projectFps);
+            // Transitions fade the sound too (a cross-dissolve becomes a cross-fade).
+            double fadeIn = Math.Max(clip.FadeInSeconds, (rc.FadeInFrames + rc.BlackInFrames) / projectFps);
+            double fadeOut = Math.Max(clip.FadeOutSeconds, (rc.FadeOutFrames + rc.BlackOutFrames) / projectFps);
+            string effects = AudioFilters.ClipEffects(clip.VolumeDb, fadeIn, fadeOut, clip.Length / projectFps);
             filters.Add($"[{input}:a:0]aresample={SampleRate},aformat=channel_layouts=stereo{speed}{effects}," +
                         $"atrim=0:{Sec(clip.Length)},adelay={delayMs}:all=1[{label}]");
             audioLabels.Add(label);

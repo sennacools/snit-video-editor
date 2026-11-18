@@ -8,7 +8,9 @@ namespace Snit.Services;
 /// One track's picture at the current moment: the clip, and (for video and pictures) its
 /// decoded pixels. Titles have no pixels; the window draws them itself.
 /// </summary>
-public sealed record LayerFrame(VideoSegment Segment, DecodedFrame? Picture);
+/// <param name="Visibility">0-1 from transitions (multiplied with the clip's opacity).</param>
+/// <param name="Brightness">0 = black, 1 = normal (dip to black).</param>
+public sealed record LayerFrame(VideoSegment Segment, DecodedFrame? Picture, double Visibility = 1, double Brightness = 1);
 
 /// <summary>
 /// The preview player. It runs on its own thread, so decoding never freezes the window.
@@ -234,42 +236,59 @@ public sealed class PlaybackEngine : IDisposable
         {
             var next = current[i].FirstOrDefault(s => s.Start > frame);
             if (next is not null && next.Start - frame <= fps)
-                frames.Prepare(next, i);
+                frames.Prepare(next, DecoderSlot(i, next));
         }
     }
+
+    /// <summary>
+    /// Every track has two places in the bundle: the earlier and the later clip. Normally only
+    /// one is used; during a cross-dissolve both are (the later one on top).
+    /// </summary>
+    public const int LayersPerTrack = 2;
+
+    /// <summary>Each clip keeps the same decoder slot (its track, and 0/1 alternating per clip), so a
+    /// clip doesn't need a new decoder when the clip before it ends.</summary>
+    private static int DecoderSlot(int track, VideoSegment segment) => track * LayersPerTrack + segment.Slot;
 
     /// <summary>Decode the pictures for a timeline frame and hand them to the window.</summary>
     private void Show(long frame)
     {
         var current = layers;
-        var active = new VideoSegment?[current.Count];
+        var active = new VideoSegment?[current.Count * LayersPerTrack];
 
         // From the top track down: stop once a clip hides everything below it.
-        for (int i = current.Count - 1; i >= 0; i--)
+        for (int t = current.Count - 1; t >= 0; t--)
         {
-            active[i] = current[i].FirstOrDefault(s => s.Start <= frame && frame < s.End);
-            if (active[i]?.CoversFrame(frameWidth, frameHeight) == true) break;
+            var here = current[t].Where(s => s.Start <= frame && frame < s.End).OrderBy(s => s.Start).Take(LayersPerTrack).ToList();
+            for (int k = 0; k < here.Count; k++) active[t * LayersPerTrack + k] = here[k];
+
+            VideoSegment? top = here.LastOrDefault();
+            bool covers = top is not null && top.CoversFrame(frameWidth, frameHeight)
+                          && top.VisibilityAt(frame) >= 1 && top.BrightnessAt(frame) >= 1;
+            if (covers) break;
         }
 
         // Skip the work if exactly the same thing is already on screen.
         string key = string.Join("|", active.Select(s => s is null ? "-"
-            : $"{s.ClipId}:{(s.Kind is MediaKind.Video ? s.SourceFrameAt(frame) : 0)}:{s.Look.GetHashCode()}:{s.Title?.Text}"));
+            : $"{s.ClipId}:{(s.Kind is MediaKind.Video ? s.SourceFrameAt(frame) : 0)}:{s.Look.GetHashCode()}:{s.Title?.Text}" +
+              $":{s.VisibilityAt(frame):0.###}:{s.BrightnessAt(frame):0.###}"));
         if (key == lastShownKey) return;
 
-        var bundle = new LayerFrame?[current.Count];
+        var bundle = new LayerFrame?[active.Length];
         for (int i = 0; i < active.Length; i++)
         {
             VideoSegment? s = active[i];
             if (s is null) continue;
+            double visibility = s.VisibilityAt(frame), brightness = s.BrightnessAt(frame);
             if (s.Kind == MediaKind.Text)
             {
-                bundle[i] = new LayerFrame(s, null); // the window draws titles
+                bundle[i] = new LayerFrame(s, null, visibility, brightness); // the window draws titles
                 continue;
             }
             DecodedFrame? picture = null;
-            try { picture = frames.GetFrame(s, s.SourceFrameAt(frame), i); }
+            try { picture = frames.GetFrame(s, s.SourceFrameAt(frame), DecoderSlot(i / LayersPerTrack, s)); }
             catch (Exception ex) { Debug.WriteLine($"Decoding failed: {ex.Message}"); }
-            if (picture is not null) bundle[i] = new LayerFrame(s, picture);
+            if (picture is not null) bundle[i] = new LayerFrame(s, picture, visibility, brightness);
         }
 
         lastShownKey = key;

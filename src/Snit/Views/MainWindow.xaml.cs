@@ -120,6 +120,7 @@ public partial class MainWindow : Window
             (Key.Z, true, true) => tl.RedoCommand,
             (Key.Y, true, false) => tl.RedoCommand,
             (Key.K, true, false) => tl.SplitAtPlayheadCommand,
+            (Key.D, true, false) => tl.AddDissolveAtPlayheadCommand,
             (Key.N, true, false) => viewModel.NewProjectCommand,
             (Key.O, true, false) => viewModel.OpenProjectCommand,
             (Key.S, true, false) => viewModel.SaveCommand,

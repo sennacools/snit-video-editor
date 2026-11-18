@@ -51,16 +51,24 @@ public class ExportRunTests(TestMedia media) : IClassFixture<TestMedia>
         string output = Path.Combine(media.Folder, "cancelled.mp4");
         var plan = ExportCommandBuilder.Build(project, new ExportSettings { OutputPath = output, Width = 3840, Height = 2160 });
 
-        using var cancel = new CancellationTokenSource(TimeSpan.FromSeconds(1.5));
+        // Press "Stop" as soon as the export reports that it has started writing frames, like a
+        // person would. (A timer is unreliable on a busy computer: it can go off very late.)
+        using var cancel = new CancellationTokenSource();
         var watch = Stopwatch.StartNew();
         TimeSpan cancelledAt = TimeSpan.Zero;
         cancel.Token.Register(() => cancelledAt = watch.Elapsed);
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => new Exporter().RunAsync(plan, null, cancel.Token));
-        // What matters is how quickly it stops after you cancel. (On a busy computer the
-        // 1.5 s timer itself can go off late, so we don't count that part.)
+        var stopAtFirstProgress = new ImmediateProgress(p => { if (p.Frame > 0) cancel.Cancel(); });
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => new Exporter().RunAsync(plan, stopAtFirstProgress, cancel.Token));
+        // What matters is how quickly it stops after you cancel.
         Assert.True(watch.Elapsed - cancelledAt < TimeSpan.FromSeconds(5),
             $"Cancelled at {cancelledAt.TotalSeconds:0.0} s, stopped at {watch.Elapsed.TotalSeconds:0.0} s (ffmpeg: {FFmpegLocator.Current.FfmpegPath}).");
         int stillRunning = Process.GetProcessesByName("ffmpeg").Length;
         Assert.False(File.Exists(output), $"The half-written video was not removed ({stillRunning} ffmpeg process(es) still running).");
+    }
+
+    /// <summary>Calls the action right away (Progress&lt;T&gt; would post it to another thread later).</summary>
+    private sealed class ImmediateProgress(Action<ExportProgress> action) : IProgress<ExportProgress>
+    {
+        public void Report(ExportProgress value) => action(value);
     }
 }

@@ -179,6 +179,60 @@
                                Text="Or pick the T tool under the timeline and click on a video track. Change the text, font and colour in the inspector on the right."/>
                 </StackPanel>
 
+                <!-- ===== Transitions tab ===== -->
+                <StackPanel Margin="10,12,10,0">
+                    <StackPanel.Style>
+                        <Style TargetType="StackPanel">
+                            <Setter Property="Visibility" Value="Collapsed"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding Bin.ActiveTab}" Value="Transitions">
+                                    <Setter Property="Visibility" Value="Visible"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </StackPanel.Style>
+
+                    <UniformGrid Columns="2">
+                        <!-- Tag says which transition the tile drags. -->
+                        <Border Tag="CrossDissolve" Margin="0,0,5,0" Cursor="Hand" Background="Transparent"
+                                ToolTip="Drag onto the start or end of a clip, or onto a cut between two clips"
+                                PreviewMouseLeftButtonDown="TransitionTile_MouseDown" PreviewMouseMove="TransitionTile_MouseMove">
+                            <StackPanel>
+                                <Border CornerRadius="5" Height="70" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1">
+                                    <Border.Background>
+                                        <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                                            <GradientStop Color="#3B5BA9" Offset="0.15"/>
+                                            <GradientStop Color="#7A4FB5" Offset="0.85"/>
+                                        </LinearGradientBrush>
+                                    </Border.Background>
+                                </Border>
+                                <TextBlock Text="Cross dissolve" Margin="1,5,1,0" FontSize="11" Foreground="{StaticResource SecondaryTextBrush}"/>
+                            </StackPanel>
+                        </Border>
+                        <Border Tag="DipToBlack" Margin="5,0,0,0" Cursor="Hand" Background="Transparent"
+                                ToolTip="Drag onto the start or end of a clip, or onto a cut between two clips"
+                                PreviewMouseLeftButtonDown="TransitionTile_MouseDown" PreviewMouseMove="TransitionTile_MouseMove">
+                            <StackPanel>
+                                <Border CornerRadius="5" Height="70" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1">
+                                    <Border.Background>
+                                        <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                                            <GradientStop Color="#3B5BA9" Offset="0.05"/>
+                                            <GradientStop Color="#000000" Offset="0.5"/>
+                                            <GradientStop Color="#7A4FB5" Offset="0.95"/>
+                                        </LinearGradientBrush>
+                                    </Border.Background>
+                                </Border>
+                                <TextBlock Text="Dip to black" Margin="1,5,1,0" FontSize="11" Foreground="{StaticResource SecondaryTextBrush}"/>
+                            </StackPanel>
+                        </Border>
+                    </UniformGrid>
+
+                    <Button Content="Cross dissolve at playhead cut" HorizontalAlignment="Left" Margin="0,14,0,0"
+                            Command="{Binding Timeline.AddDissolveAtPlayheadCommand}" ToolTip="Ctrl+D"/>
+                    <TextBlock Style="{StaticResource MutedText}" TextWrapping="Wrap" Margin="0,12,0,0"
+                               Text="A cross dissolve between two clips uses a little extra footage from beyond the cut, if the files have it. Change the length or remove it in the inspector."/>
+                </StackPanel>
+
                 <!-- ===== Other tabs (not built yet) ===== -->
                 <TextBlock Text="Coming in a later phase."
                            HorizontalAlignment="Center" VerticalAlignment="Center">
@@ -189,6 +243,9 @@
                                     <Setter Property="Visibility" Value="Collapsed"/>
                                 </DataTrigger>
                                 <DataTrigger Binding="{Binding Bin.ActiveTab}" Value="Text">
+                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding Bin.ActiveTab}" Value="Transitions">
                                     <Setter Property="Visibility" Value="Collapsed"/>
                                 </DataTrigger>
                             </Style.Triggers>

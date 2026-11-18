@@ -18,6 +18,7 @@ public sealed class TestMedia : IDisposable
     public string Video25 => Path.Combine(Folder, "pattern 25fps.mp4");
     public string Tone => Path.Combine(Folder, "tone.mp3");
     public string White => Path.Combine(Folder, "white.png");
+    public string Red => Path.Combine(Folder, "red.png");
 
     public TestMedia()
     {
@@ -29,6 +30,7 @@ public sealed class TestMedia : IDisposable
         Make($"-f lavfi -i testsrc2=size=320x180:rate=25:duration=3 -c:v libx264 -pix_fmt yuv420p \"{Video25}\"");
         Make($"-f lavfi -i sine=frequency=330:duration=2 -c:a libmp3lame \"{Tone}\"");
         Make($"-f lavfi -i color=c=white:s=320x180 -frames:v 1 \"{White}\"");
+        Make($"-f lavfi -i color=c=red:s=320x180 -frames:v 1 \"{Red}\"");
     }
 
     private static void Make(string args)

@@ -73,20 +73,26 @@
                             </ItemsControl.ItemsPanel>
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
-                                    <!-- Centred, then sized, turned and moved around its middle. -->
-                                    <Image Source="{Binding Source}" Width="{Binding Width}" Height="{Binding Height}"
-                                           Stretch="Fill" Opacity="{Binding Opacity}"
-                                           HorizontalAlignment="Center" VerticalAlignment="Center"
-                                           RenderTransformOrigin="0.5,0.5" RenderOptions.BitmapScalingMode="Linear"
-                                           Visibility="{Binding IsVisible, Converter={StaticResource BoolToVisibility}}">
-                                        <Image.RenderTransform>
+                                    <!-- Centred, then sized, turned and moved around its middle. The black
+                                         rectangle on top darkens the picture for "dip to black"; the
+                                         opacity mask keeps it to the picture's own (solid) pixels. -->
+                                    <Grid Width="{Binding Width}" Height="{Binding Height}" Opacity="{Binding Opacity}"
+                                          HorizontalAlignment="Center" VerticalAlignment="Center"
+                                          RenderTransformOrigin="0.5,0.5"
+                                          Visibility="{Binding IsVisible, Converter={StaticResource BoolToVisibility}}">
+                                        <Grid.RenderTransform>
                                             <TransformGroup>
                                                 <ScaleTransform ScaleX="{Binding Scale}" ScaleY="{Binding Scale}"/>
                                                 <RotateTransform Angle="{Binding Rotation}"/>
                                                 <TranslateTransform X="{Binding OffsetX}" Y="{Binding OffsetY}"/>
                                             </TransformGroup>
-                                        </Image.RenderTransform>
-                                    </Image>
+                                        </Grid.RenderTransform>
+                                        <Grid.OpacityMask>
+                                            <ImageBrush ImageSource="{Binding Source}"/>
+                                        </Grid.OpacityMask>
+                                        <Image Source="{Binding Source}" Stretch="Fill" RenderOptions.BitmapScalingMode="Linear"/>
+                                        <Rectangle Fill="Black" Opacity="{Binding Darken}"/>
+                                    </Grid>
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>

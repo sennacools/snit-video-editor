@@ -9,8 +9,9 @@ public sealed record VideoSegment(long Start, long End, string Path, MediaKind K
     public long SourceFrameAt(long timelineFrame) => SourceStart + (timelineFrame - Start);
 }
 
-/// <summary>One audio clip that should be heard during playback.</summary>
-public sealed record AudioPiece(long Start, long End, string Path, long SourceStart);
+/// <summary>One audio clip that should be heard during playback, with its volume and fades.</summary>
+public sealed record AudioPiece(long Start, long End, string Path, long SourceStart,
+    double VolumeDb = 0, double FadeInSeconds = 0, double FadeOutSeconds = 0);
 
 /// <summary>
 /// Turns the project into simple, read-only lists for the preview player.
@@ -65,6 +66,6 @@ public static class PreviewPlan
             .Where(t => t.Kind == TrackKind.Audio && !t.IsOff)
             .SelectMany(t => t.Clips)
             .Where(c => !c.Media.IsOffline)
-            .Select(c => new AudioPiece(c.Start, c.End, c.Media.FilePath, c.In))
+            .Select(c => new AudioPiece(c.Start, c.End, c.Media.FilePath, c.In, c.VolumeDb, c.FadeInSeconds, c.FadeOutSeconds))
             .ToList();
 }

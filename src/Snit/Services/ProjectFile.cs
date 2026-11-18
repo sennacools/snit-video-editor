@@ -29,7 +29,19 @@ public static class ProjectFile
     private sealed record MediaData(Guid Id, string Path, string? RelativePath, MediaKind Kind,
         double Duration, int Width, int Height, double FrameRate, bool HasAudio);
     private sealed record TrackData(string Name, bool IsOff, bool IsLocked, List<ClipData> Clips);
-    private sealed record ClipData(Guid Id, Guid MediaId, long Start, long In, long Length, Guid? LinkId);
+    // A class (not a record) so that fields added later are simply 0 when opening older projects.
+    private sealed class ClipData
+    {
+        public Guid Id { get; init; }
+        public Guid MediaId { get; init; }
+        public long Start { get; init; }
+        public long In { get; init; }
+        public long Length { get; init; }
+        public Guid? LinkId { get; init; }
+        public double VolumeDb { get; init; }
+        public double FadeIn { get; init; }
+        public double FadeOut { get; init; }
+    }
 
     // ---- Save ----
 
@@ -46,7 +58,11 @@ public static class ProjectFile
             project.Tracks.Select(t => new TrackData(
                 t.Name, t.IsOff, t.IsLocked,
                 t.Clips.OrderBy(c => c.Start)
-                    .Select(c => new ClipData(c.Id, c.Media.Id, c.Start, c.In, c.Length, c.LinkId)).ToList())).ToList());
+                    .Select(c => new ClipData
+                    {
+                        Id = c.Id, MediaId = c.Media.Id, Start = c.Start, In = c.In, Length = c.Length, LinkId = c.LinkId,
+                        VolumeDb = c.VolumeDb, FadeIn = c.FadeInSeconds, FadeOut = c.FadeOutSeconds,
+                    }).ToList())).ToList());
 
         // Write to a temporary file first, so a crash halfway never leaves a broken project.
         string temp = path + ".tmp";
@@ -109,6 +125,7 @@ public static class ProjectFile
                 track.Clips.Add(new Clip
                 {
                     Id = c.Id, Media = media, Start = c.Start, In = c.In, Length = c.Length, LinkId = c.LinkId,
+                    VolumeDb = c.VolumeDb, FadeInSeconds = c.FadeIn, FadeOutSeconds = c.FadeOut,
                 });
             }
         }

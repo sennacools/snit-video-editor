@@ -31,8 +31,10 @@ public static class TimelineEdits
                 right.Start = end;
                 right.In = other.In + (end - other.Start);
                 right.Length = other.End - end;
+                right.FadeInSeconds = 0;
                 track.Clips.Add(right);
                 other.Length = start - other.Start;
+                other.FadeOutSeconds = 0;
             }
             else if (!startsInside)
             {
@@ -64,6 +66,9 @@ public static class TimelineEdits
         right.Length = clip.Length - leftLength;
 
         clip.Length = leftLength;
+        // The fade-in stays at the very start and the fade-out at the very end, not at the cut.
+        clip.FadeOutSeconds = 0;
+        right.FadeInSeconds = 0;
         track.Clips.Add(right);
         return right;
     }

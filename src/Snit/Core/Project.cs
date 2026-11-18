@@ -79,6 +79,17 @@ public sealed class Clip
     /// <summary>Clips with the same LinkId belong together (a video and its own sound) and are edited as one.</summary>
     public Guid? LinkId { get; set; }
 
+    // ---- Sound settings (used by clips on audio tracks) ----
+
+    /// <summary>Louder or quieter, in decibels. 0 = unchanged, -6 ≈ half as loud, +6 ≈ twice as loud.</summary>
+    public double VolumeDb { get; set; }
+
+    /// <summary>Seconds over which the sound rises from silence at the start of the clip.</summary>
+    public double FadeInSeconds { get; set; }
+
+    /// <summary>Seconds over which the sound falls to silence at the end of the clip.</summary>
+    public double FadeOutSeconds { get; set; }
+
     public long End => Start + Length;
     public string Name => Media.Name;
 

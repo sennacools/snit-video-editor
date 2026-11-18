@@ -53,13 +53,17 @@ public sealed class AudioPreview : IDisposable
         {
             AudioPiece p = audible[i];
             double start = p.Start / fps;
+            double length = (p.End - p.Start) / fps;
             double skip = Math.Max(0, from - start);           // part of the clip already behind us
-            double sourceStart = p.SourceStart / fps + skip;
-            double length = (p.End - p.Start) / fps - skip;
             int delayMs = (int)Math.Round(Math.Max(0, start - from) * 1000);
 
-            args.AddRange(["-ss", ProcessRunner.Num(sourceStart), "-t", ProcessRunner.Num(length), "-i", p.Path]);
-            filters.Add($"[{i}:a:0]aresample={SampleRate},aformat=channel_layouts=stereo,adelay={delayMs}:all=1[a{i}]");
+            // Read the whole clip and apply volume and fades first, then skip the part that is
+            // already behind us; that way a fade sounds right even when you start halfway through it.
+            string effects = AudioFilters.ClipEffects(p.VolumeDb, p.FadeInSeconds, p.FadeOutSeconds, length);
+            string trim = skip > 0 ? $",atrim=start={ProcessRunner.Num(skip)},asetpts=PTS-STARTPTS" : "";
+
+            args.AddRange(["-ss", ProcessRunner.Num(p.SourceStart / fps), "-t", ProcessRunner.Num(length), "-i", p.Path]);
+            filters.Add($"[{i}:a:0]aresample={SampleRate},aformat=channel_layouts=stereo{effects}{trim},adelay={delayMs}:all=1[a{i}]");
         }
 
         string inputs = string.Concat(Enumerable.Range(0, audible.Count).Select(i => $"[a{i}]"));

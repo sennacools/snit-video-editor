@@ -77,7 +77,8 @@ public static class ExportCommandBuilder
             args.AddRange(["-ss", Sec(clip.In), "-t", Sec(clip.Length), "-i", clip.Media.FilePath]);
             long delayMs = (long)Math.Round(clip.Start / projectFps * 1000);
             string label = $"a{input}";
-            filters.Add($"[{input}:a:0]aresample={SampleRate},aformat=channel_layouts=stereo,adelay={delayMs}:all=1[{label}]");
+            string effects = AudioFilters.ClipEffects(clip.VolumeDb, clip.FadeInSeconds, clip.FadeOutSeconds, clip.Length / projectFps);
+            filters.Add($"[{input}:a:0]aresample={SampleRate},aformat=channel_layouts=stereo{effects},adelay={delayMs}:all=1[{label}]");
             audioLabels.Add(label);
             input++;
         }

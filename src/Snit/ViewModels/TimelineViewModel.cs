@@ -16,6 +16,9 @@ public partial class TimelineViewModel : ObservableObject
 
     public Project Project { get; private set; } = null!;
     public System.Collections.ObjectModel.ObservableCollection<Track> Tracks => Project.Tracks;
+
+    /// <summary>The sound tracks, A1 first (for the audio mixer).</summary>
+    public IReadOnlyList<Track> AudioTracks => Project.Tracks.Where(t => t.Kind == TrackKind.Audio).ToList();
     public double Fps => Project.Fps;
 
     /// <summary>Clips were added, moved, cut... The preview needs updating and the project needs saving.</summary>
@@ -31,8 +34,11 @@ public partial class TimelineViewModel : ObservableObject
         if (Project is not null)
             foreach (var t in Project.Tracks) t.PropertyChanged -= OnTrackChanged;
 
+        if (Project is not null) Project.Tracks.CollectionChanged -= OnTracksChanged;
         Project = project;
         foreach (var t in project.Tracks) t.PropertyChanged += OnTrackChanged;
+        project.Tracks.CollectionChanged += OnTracksChanged;
+        OnPropertyChanged(nameof(AudioTracks));
 
         Selection.Clear();
         undoStack.Clear();
@@ -1214,4 +1220,7 @@ public partial class TimelineViewModel : ObservableObject
         rippleOriginals = [];
         dragAnchor = null;
     }
+
+    private void OnTracksChanged(object? sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
+        => OnPropertyChanged(nameof(AudioTracks));
 }

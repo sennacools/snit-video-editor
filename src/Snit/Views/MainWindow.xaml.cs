@@ -33,6 +33,7 @@ public partial class MainWindow : Window
 
         viewModel.ExportRequested += exportViewModel => new ExportWindow(exportViewModel) { Owner = this }.ShowDialog();
         viewModel.CapturePreview = () => Monitor.Capture();
+        viewModel.CaptureFrame = width => Monitor.CaptureSmall(width);
         Loaded += OnLoaded;
         StateChanged += (_, _) => UpdateMaximizedLook();
         Closed += (_, _) => viewModel.Dispose();
@@ -47,6 +48,11 @@ public partial class MainWindow : Window
         // Double-clicking a .snit file starts Snit with the file name.
         string? projectFile = args.Skip(1).FirstOrDefault(a => a.EndsWith(".snit", StringComparison.OrdinalIgnoreCase) && File.Exists(a));
         if (projectFile is not null) viewModel.OpenProjectFile(projectFile);
+
+        // Helper: "--workspace Color" (or Audio) starts in that workspace.
+        int ws = Array.IndexOf(args, "--workspace");
+        if (ws >= 0 && ws + 1 < args.Length && args[ws + 1] is "Edit" or "Color" or "Audio")
+            viewModel.Workspace = args[ws + 1];
 
         // Developer helper: "Snit.exe --screenshot docs/screenshot.png" saves a picture
         // of the window and quits. Used to keep the README screenshot up to date.

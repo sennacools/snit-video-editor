@@ -1,0 +1,101 @@
+<!-- Color workspace, right: colour grading for the selected clip (like Lumetri Color). -->
+<UserControl x:Class="Snit.Views.ColorPanelView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:controls="clr-namespace:Snit.Controls">
+    <UserControl.Resources>
+        <Style x:Key="WheelLabel" TargetType="TextBlock">
+            <Setter Property="HorizontalAlignment" Value="Center"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="Foreground" Value="{StaticResource SecondaryTextBrush}"/>
+            <Setter Property="Margin" Value="0,0,0,4"/>
+        </Style>
+        <Style x:Key="CurveTab" TargetType="RadioButton" BasedOn="{StaticResource SegmentButton}">
+            <Setter Property="Padding" Value="9,2"/>
+            <Setter Property="GroupName" Value="CurveChannel"/>
+        </Style>
+    </UserControl.Resources>
+
+    <Border Style="{StaticResource PanelBorder}">
+        <DockPanel>
+            <Border DockPanel.Dock="Top" BorderBrush="{StaticResource RowDividerBrush}" BorderThickness="0,0,0,1" Padding="14,10">
+                <DockPanel>
+                    <Button DockPanel.Dock="Right" Content="Reset" Padding="8,2" FontSize="11" VerticalAlignment="Center"
+                            Command="{Binding Inspector.ResetColorCommand}" ToolTip="Put every colour setting of this clip back to normal"/>
+                    <StackPanel>
+                        <TextBlock Text="COLOR" Style="{StaticResource MutedText}" FontWeight="SemiBold"/>
+                        <TextBlock Text="{Binding Inspector.ClipName}" FontSize="14" FontWeight="SemiBold" Margin="0,4,0,0"
+                                   Foreground="{StaticResource SecondaryTextBrush}" TextTrimming="CharacterEllipsis"/>
+                    </StackPanel>
+                </DockPanel>
+            </Border>
+
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <StackPanel Margin="14,0,14,14" IsEnabled="{Binding Inspector.HasVisual}">
+                    <TextBlock Text="BASIC CORRECTION" Style="{StaticResource SectionTitle}"/>
+                    <controls:PropertySlider Label="Exposure" Minimum="-3" Maximum="3"
+                                             Value="{Binding Inspector.Exposure}" Format="{}{0:+0.0;-0.0;0.0}"/>
+                    <controls:PropertySlider Label="Contrast" Minimum="-100" Maximum="100"
+                                             Value="{Binding Inspector.Contrast}" Format="{}{0:+0;-0;0}"/>
+                    <controls:PropertySlider Label="Saturation" Minimum="0" Maximum="200"
+                                             Value="{Binding Inspector.Saturation}" Format="{}{0:0}%"/>
+                    <controls:PropertySlider Label="Temperature" Minimum="-100" Maximum="100"
+                                             Value="{Binding Inspector.Temperature}" Format="{}{0:+0;-0;0}"/>
+                    <controls:PropertySlider Label="Tint" Minimum="-100" Maximum="100"
+                                             Value="{Binding Inspector.Tint}" Format="{}{0:+0;-0;0}"/>
+
+                    <TextBlock Text="COLOR WHEELS" Style="{StaticResource SectionTitle}"/>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition/>
+                            <ColumnDefinition Width="8"/>
+                            <ColumnDefinition/>
+                            <ColumnDefinition Width="8"/>
+                            <ColumnDefinition/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="Shadows" Style="{StaticResource WheelLabel}"/>
+                            <controls:ColorWheelControl Height="82" X="{Binding Inspector.ShadowsX}" Y="{Binding Inspector.ShadowsY}"/>
+                            <Slider Minimum="-1" Maximum="1" Margin="0,6,0,0" Value="{Binding Inspector.ShadowsLight}"
+                                    ToolTip="Darker or lighter shadows"/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="2">
+                            <TextBlock Text="Midtones" Style="{StaticResource WheelLabel}"/>
+                            <controls:ColorWheelControl Height="82" X="{Binding Inspector.MidtonesX}" Y="{Binding Inspector.MidtonesY}"/>
+                            <Slider Minimum="-1" Maximum="1" Margin="0,6,0,0" Value="{Binding Inspector.MidtonesLight}"
+                                    ToolTip="Darker or lighter midtones"/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="4">
+                            <TextBlock Text="Highlights" Style="{StaticResource WheelLabel}"/>
+                            <controls:ColorWheelControl Height="82" X="{Binding Inspector.HighlightsX}" Y="{Binding Inspector.HighlightsY}"/>
+                            <Slider Minimum="-1" Maximum="1" Margin="0,6,0,0" Value="{Binding Inspector.HighlightsLight}"
+                                    ToolTip="Darker or lighter highlights"/>
+                        </StackPanel>
+                    </Grid>
+                    <TextBlock Style="{StaticResource MutedText}" TextWrapping="Wrap" Margin="0,6,0,0"
+                               Text="Drag a wheel towards a colour to tint that part of the picture. Double-click a wheel to reset it."/>
+
+                    <TextBlock Text="CURVES" Style="{StaticResource SectionTitle}"/>
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+                        <RadioButton x:Name="MasterTab" Style="{StaticResource CurveTab}" Content="All" IsChecked="True"/>
+                        <RadioButton x:Name="RedTab" Style="{StaticResource CurveTab}" Content="Red" Foreground="#FF7A7A"/>
+                        <RadioButton x:Name="GreenTab" Style="{StaticResource CurveTab}" Content="Green" Foreground="#7AE08A"/>
+                        <RadioButton x:Name="BlueTab" Style="{StaticResource CurveTab}" Content="Blue" Foreground="#7AA8FF"/>
+                    </StackPanel>
+                    <Grid Height="200">
+                        <controls:CurveEditor Points="{Binding Inspector.CurveMaster}" CurveBrush="White"
+                                              Visibility="{Binding IsChecked, ElementName=MasterTab, Converter={StaticResource BoolToVisibility}}"/>
+                        <controls:CurveEditor Points="{Binding Inspector.CurveRed}" CurveBrush="#FF6B6B"
+                                              Visibility="{Binding IsChecked, ElementName=RedTab, Converter={StaticResource BoolToVisibility}}"/>
+                        <controls:CurveEditor Points="{Binding Inspector.CurveGreen}" CurveBrush="#6BDB7E"
+                                              Visibility="{Binding IsChecked, ElementName=GreenTab, Converter={StaticResource BoolToVisibility}}"/>
+                        <controls:CurveEditor Points="{Binding Inspector.CurveBlue}" CurveBrush="#6B9BFF"
+                                              Visibility="{Binding IsChecked, ElementName=BlueTab, Converter={StaticResource BoolToVisibility}}"/>
+                    </Grid>
+                    <TextBlock Style="{StaticResource MutedText}" TextWrapping="Wrap" Margin="0,6,0,0"
+                               Text="Click the line to add a point and drag it: up is brighter. Right-click a point to remove it, double-click to straighten."/>
+                </StackPanel>
+            </ScrollViewer>
+        </DockPanel>
+    </Border>
+</UserControl>

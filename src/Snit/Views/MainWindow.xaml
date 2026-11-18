@@ -202,11 +202,21 @@
                 <ColumnDefinition Width="300" MinWidth="240"/>
             </Grid.ColumnDefinitions>
 
-            <views:MediaBinView Grid.Column="0"/>
+            <views:MediaBinView Grid.Column="0"
+                                Visibility="{Binding Workspace, Converter={StaticResource WorkspaceVisibility}, ConverterParameter=Edit}"/>
+            <views:ScopesView Grid.Column="0"
+                              Visibility="{Binding Workspace, Converter={StaticResource WorkspaceVisibility}, ConverterParameter=Color}"/>
+            <views:MixerView Grid.Column="0"
+                             Visibility="{Binding Workspace, Converter={StaticResource WorkspaceVisibility}, ConverterParameter=Audio}"/>
             <GridSplitter Grid.Column="1" ResizeDirection="Columns" Cursor="SizeWE"/>
             <views:ProgramMonitorView x:Name="Monitor" Grid.Column="2"/>
             <GridSplitter Grid.Column="3" ResizeDirection="Columns" Cursor="SizeWE"/>
-            <views:InspectorView Grid.Column="4"/>
+            <views:InspectorView Grid.Column="4"
+                                 Visibility="{Binding Workspace, Converter={StaticResource WorkspaceVisibility}, ConverterParameter=Edit}"/>
+            <views:ColorPanelView Grid.Column="4"
+                                  Visibility="{Binding Workspace, Converter={StaticResource WorkspaceVisibility}, ConverterParameter=Color}"/>
+            <views:AudioPanelView Grid.Column="4"
+                                  Visibility="{Binding Workspace, Converter={StaticResource WorkspaceVisibility}, ConverterParameter=Audio}"/>
         </Grid>
 
         <GridSplitter Grid.Row="3" ResizeDirection="Rows" Cursor="SizeNS"/>

@@ -36,6 +36,12 @@ It's built with C#, WPF and FFmpeg.
   the clip's sound cross-fades along. A dissolve uses footage just beyond the cut if the files have it
 - **Effects** (Effects tab): blur, sharpen, crop, vignette, flip, green screen (chroma key) and
   colour LUTs (.cube). Drag one onto a clip, then change, switch off or remove it in the inspector
+- **Color workspace** (Color button, top right): scopes on the left (waveform, RGB parade,
+  vectorscope, histogram) measuring the program picture, and a Lumetri-style panel on the right:
+  basic correction with tint, three colour wheels (shadows, midtones, highlights) and RGB curves
+- **Audio workspace**: a track mixer on the left (volume fader, balance, mute and solo per sound
+  track) and the clip's sound on the right: volume with keyframes, fades, a three-band
+  equaliser (bass, voice, treble) and noise reduction
 - **In and out marks** (I and O) to export just a part of the timeline
 - **Undo / redo** for every timeline edit (one slider drag or one bit of typing is one step)
 - **Projects** saved as `.snit` files (plain JSON; media files are referenced, never copied),
@@ -140,7 +146,8 @@ Some tests make tiny test videos with FFmpeg in a temporary folder; they are ski
 isn't installed.
 
 To refresh the screenshot above: `dotnet run --project src/Snit -- --screenshot docs/screenshot.png`
-(you can put a `.snit` file before `--screenshot` to show a project).
+(you can put a `.snit` file before `--screenshot` to show a project, and `--workspace Color` or
+`--workspace Audio` to start in that workspace).
 To export a project without opening the dialog: `Snit.exe project.snit --export video.mp4`.
 
 ## License

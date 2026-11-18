@@ -565,6 +565,45 @@
                 </ControlTemplate>
             </Setter.Value>
         </Setter>
+        <Style.Triggers>
+            <!-- Upright sliders (the mixer's volume faders): the same look, turned. -->
+            <Trigger Property="Orientation" Value="Vertical">
+                <Setter Property="VerticalAlignment" Value="Stretch"/>
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="Slider">
+                            <Grid Width="18" Background="Transparent">
+                                <Border Width="4" CornerRadius="2" Background="{StaticResource BorderBrush}"/>
+                                <Track x:Name="PART_Track" IsDirectionReversed="True">
+                                    <Track.DecreaseRepeatButton>
+                                        <RepeatButton Focusable="False" Command="Slider.DecreaseLarge">
+                                            <RepeatButton.Template>
+                                                <ControlTemplate TargetType="RepeatButton">
+                                                    <Grid Background="Transparent">
+                                                        <Border Width="4" CornerRadius="2" Background="{StaticResource AccentBrush}"/>
+                                                    </Grid>
+                                                </ControlTemplate>
+                                            </RepeatButton.Template>
+                                        </RepeatButton>
+                                    </Track.DecreaseRepeatButton>
+                                    <Track.IncreaseRepeatButton>
+                                        <RepeatButton Style="{StaticResource SliderEmptyPart}" Command="Slider.IncreaseLarge"/>
+                                    </Track.IncreaseRepeatButton>
+                                    <Track.Thumb>
+                                        <Thumb Style="{StaticResource SliderThumb}"/>
+                                    </Track.Thumb>
+                                </Track>
+                            </Grid>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsEnabled" Value="False">
+                                    <Setter Property="Opacity" Value="0.45"/>
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Trigger>
+        </Style.Triggers>
     </Style>
 
     <!-- ===================== Scroll bars (slim) ===================== -->
@@ -802,4 +841,26 @@
         <Setter Property="BorderThickness" Value="0,0,0,1"/>
     </Style>
 
+
+    <!-- Shared by the inspector, the Color panel and the Audio panel. -->
+    <!-- The keyframe diamond next to a transform slider: blue when the setting is animated. -->
+    <Style x:Key="KeyframeButton" TargetType="Button" BasedOn="{StaticResource IconButton}">
+        <Setter Property="FontFamily" Value="{StaticResource UiFont}"/>
+        <Setter Property="FontSize" Value="12"/>
+        <Setter Property="Width" Value="22"/>
+        <Setter Property="Height" Value="22"/>
+        <Setter Property="Margin" Value="4,0,0,0"/>
+        <Setter Property="Foreground" Value="{StaticResource MutedTextBrush}"/>
+        <Style.Triggers>
+            <DataTrigger Binding="{Binding Tag, RelativeSource={RelativeSource Self}}" Value="True">
+                <Setter Property="Foreground" Value="{StaticResource AccentBrush}"/>
+            </DataTrigger>
+        </Style.Triggers>
+    </Style>
+    <Style x:Key="SectionTitle" TargetType="TextBlock">
+        <Setter Property="FontSize" Value="11"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="Foreground" Value="{StaticResource MutedTextBrush}"/>
+        <Setter Property="Margin" Value="0,16,0,6"/>
+    </Style>
 </ResourceDictionary>

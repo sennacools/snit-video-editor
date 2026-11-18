@@ -1,0 +1,25 @@
+<!-- Color workspace, left: scopes that measure the program picture. -->
+<UserControl x:Class="Snit.Views.ScopesView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Border Style="{StaticResource PanelBorder}">
+        <DockPanel>
+            <Border DockPanel.Dock="Top" BorderBrush="{StaticResource RowDividerBrush}" BorderThickness="0,0,0,1" Height="40">
+                <StackPanel Orientation="Horizontal" Margin="6,0">
+                    <RadioButton x:Name="WaveformTab" Style="{StaticResource TabButton}" Content="Waveform" IsChecked="True"
+                                 Checked="Tab_Checked" Tag="Waveform" ToolTip="How bright each part of the picture is (top = white)"/>
+                    <RadioButton Style="{StaticResource TabButton}" Content="Parade" Checked="Tab_Checked" Tag="Parade"
+                                 ToolTip="Red, green and blue side by side"/>
+                    <RadioButton Style="{StaticResource TabButton}" Content="Vector" Checked="Tab_Checked" Tag="Vectorscope"
+                                 ToolTip="Vectorscope: which colours, and how strong (edge = vivid)"/>
+                    <RadioButton Style="{StaticResource TabButton}" Content="Histogram" Checked="Tab_Checked" Tag="Histogram"
+                                 ToolTip="How many pixels of each brightness"/>
+                </StackPanel>
+            </Border>
+            <TextBlock DockPanel.Dock="Bottom" x:Name="Hint" Style="{StaticResource MutedText}" TextWrapping="Wrap" Margin="12,8,12,12"/>
+            <Border Margin="10,12,10,0" Background="#141211" CornerRadius="4" VerticalAlignment="Top">
+                <Image x:Name="ScopePicture" Stretch="Uniform" RenderOptions.BitmapScalingMode="Linear"/>
+            </Border>
+        </DockPanel>
+    </Border>
+</UserControl>

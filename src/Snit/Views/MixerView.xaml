@@ -1,0 +1,88 @@
+<!-- Audio workspace, left: the audio track mixer. One strip per sound track: volume, balance, mute and solo. -->
+<UserControl x:Class="Snit.Views.MixerView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <UserControl.Resources>
+        <!-- M and S buttons: lit when on. -->
+        <Style x:Key="StripToggle" TargetType="ToggleButton">
+            <Setter Property="Width" Value="26"/>
+            <Setter Property="Height" Value="22"/>
+            <Setter Property="Margin" Value="2,0"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{StaticResource SecondaryTextBrush}"/>
+            <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ToggleButton">
+                        <Border x:Name="Bd" Background="{StaticResource ControlBrush}" CornerRadius="4"
+                                BorderBrush="{StaticResource BorderBrush}" BorderThickness="1">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{StaticResource ControlHoverBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{Binding Tag, RelativeSource={RelativeSource TemplatedParent}}"/>
+                                <Setter Property="Foreground" Value="#0B1220"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </UserControl.Resources>
+
+    <Border Style="{StaticResource PanelBorder}">
+        <DockPanel>
+            <Border DockPanel.Dock="Top" BorderBrush="{StaticResource RowDividerBrush}" BorderThickness="0,0,0,1" Padding="14,10">
+                <StackPanel>
+                    <TextBlock Text="AUDIO TRACK MIXER" Style="{StaticResource MutedText}" FontWeight="SemiBold"/>
+                    <TextBlock Text="Whole tracks: louder, quieter, left or right" FontSize="12" Margin="0,4,0,0"
+                               Foreground="{StaticResource SecondaryTextBrush}"/>
+                </StackPanel>
+            </Border>
+            <TextBlock DockPanel.Dock="Bottom" Style="{StaticResource MutedText}" TextWrapping="Wrap" Margin="12,8,12,12"
+                       Text="M mutes a track. S (solo) plays only the solo tracks. Double-click a slider to put it back in the middle."/>
+
+            <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
+                <ItemsControl ItemsSource="{Binding Timeline.AudioTracks}" Margin="8,10,8,0">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <StackPanel Orientation="Horizontal"/>
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Border Width="78" Margin="0,0,6,0" Padding="6,8" CornerRadius="6"
+                                    Background="{StaticResource InputBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1">
+                                <DockPanel>
+                                    <TextBlock DockPanel.Dock="Top" Text="{Binding Name}" HorizontalAlignment="Center"
+                                               FontWeight="SemiBold" Foreground="{StaticResource TextBrush}"/>
+                                    <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,8,0,0">
+                                        <ToggleButton Style="{StaticResource StripToggle}" Content="M" Tag="#E8C547"
+                                                      IsChecked="{Binding IsOff}" ToolTip="Mute this track"/>
+                                        <ToggleButton Style="{StaticResource StripToggle}" Content="S" Tag="#7AE08A"
+                                                      IsChecked="{Binding IsSolo}" ToolTip="Solo: hear only the solo tracks"/>
+                                    </StackPanel>
+                                    <TextBlock DockPanel.Dock="Top" Text="Balance" Style="{StaticResource MutedText}" FontSize="10"
+                                               HorizontalAlignment="Center" Margin="0,10,0,0"/>
+                                    <Slider DockPanel.Dock="Top" Minimum="-1" Maximum="1" Value="{Binding Pan}" Margin="0,2,0,0"
+                                            MouseDoubleClick="Pan_DoubleClick" ToolTip="Left or right"/>
+                                    <TextBlock DockPanel.Dock="Top" Text="{Binding Pan, Converter={StaticResource PanText}}"
+                                               Style="{StaticResource TimecodeText}" FontSize="11" HorizontalAlignment="Center"/>
+                                    <TextBlock DockPanel.Dock="Bottom" Text="{Binding VolumeDb, StringFormat={}{0:+0.0;-0.0;0.0} dB}"
+                                               Style="{StaticResource TimecodeText}" FontSize="11" HorizontalAlignment="Center" Margin="0,6,0,0"/>
+                                    <Slider Orientation="Vertical" Minimum="-40" Maximum="12" Value="{Binding VolumeDb}"
+                                            HorizontalAlignment="Center" Margin="0,12,0,0" MinHeight="90"
+                                            MouseDoubleClick="Volume_DoubleClick" ToolTip="Track volume"/>
+                                </DockPanel>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+        </DockPanel>
+    </Border>
+</UserControl>

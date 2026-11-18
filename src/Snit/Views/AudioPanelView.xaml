@@ -1,0 +1,62 @@
+<!-- Audio workspace, right: the sound of the selected clip (volume with keyframes, fades, equaliser, noise reduction). -->
+<UserControl x:Class="Snit.Views.AudioPanelView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:controls="clr-namespace:Snit.Controls">
+    <Border Style="{StaticResource PanelBorder}">
+        <DockPanel>
+            <Border DockPanel.Dock="Top" BorderBrush="{StaticResource RowDividerBrush}" BorderThickness="0,0,0,1" Padding="14,10">
+                <DockPanel>
+                    <Button DockPanel.Dock="Right" Content="Reset" Padding="8,2" FontSize="11" VerticalAlignment="Center"
+                            Command="{Binding Inspector.ResetSoundToolsCommand}" ToolTip="Switch the equaliser and noise reduction off"/>
+                    <StackPanel>
+                        <TextBlock Text="CLIP SOUND" Style="{StaticResource MutedText}" FontWeight="SemiBold"/>
+                        <TextBlock Text="{Binding Inspector.ClipName}" FontSize="14" FontWeight="SemiBold" Margin="0,4,0,0"
+                                   Foreground="{StaticResource SecondaryTextBrush}" TextTrimming="CharacterEllipsis"/>
+                    </StackPanel>
+                </DockPanel>
+            </Border>
+
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <StackPanel Margin="14,0,14,14">
+                    <TextBlock Style="{StaticResource MutedText}" TextWrapping="Wrap" Margin="0,14,0,0"
+                               Visibility="{Binding Inspector.HasAudio, Converter={StaticResource InverseBoolToVisibility}}"
+                               Text="Select a clip with sound on the timeline. A whole track's volume and balance are in the mixer on the left."/>
+
+                    <StackPanel IsEnabled="{Binding Inspector.HasAudio}">
+                        <TextBlock Text="VOLUME" Style="{StaticResource SectionTitle}"/>
+                        <DockPanel>
+                            <Button DockPanel.Dock="Right" Style="{StaticResource KeyframeButton}"
+                                    Content="{Binding Inspector.VolumeKey.Glyph}" ToolTip="{Binding Inspector.VolumeKey.ToolTip}"
+                                    Tag="{Binding Inspector.VolumeKey.IsAnimated}" Command="{Binding Inspector.ToggleVolumeKeyframeCommand}"/>
+                            <controls:PropertySlider Label="Volume" Minimum="-60" Maximum="12"
+                                                     Value="{Binding Inspector.VolumeDb}" Format="{}{0:+0.0;-0.0;0.0} dB"/>
+                        </DockPanel>
+                        <controls:PropertySlider Label="Fade in" Minimum="0" Maximum="{Binding Inspector.FadeMaximum}"
+                                                 Value="{Binding Inspector.FadeInSeconds}" Format="{}{0:0.0} s"/>
+                        <controls:PropertySlider Label="Fade out" Minimum="0" Maximum="{Binding Inspector.FadeMaximum}"
+                                                 Value="{Binding Inspector.FadeOutSeconds}" Format="{}{0:0.0} s"/>
+                        <TextBlock Style="{StaticResource MutedText}" TextWrapping="Wrap" Margin="0,4,0,0"
+                                   Text="The diamond animates the volume: move the playhead, change the volume, and a keyframe is set there."/>
+
+                        <TextBlock Text="EQUALIZER" Style="{StaticResource SectionTitle}"/>
+                        <controls:PropertySlider Label="Bass" Minimum="-12" Maximum="12"
+                                                 Value="{Binding Inspector.EqLow}" Format="{}{0:+0.0;-0.0;0.0} dB"/>
+                        <controls:PropertySlider Label="Voice" Minimum="-12" Maximum="12"
+                                                 Value="{Binding Inspector.EqMid}" Format="{}{0:+0.0;-0.0;0.0} dB"/>
+                        <controls:PropertySlider Label="Treble" Minimum="-12" Maximum="12"
+                                                 Value="{Binding Inspector.EqHigh}" Format="{}{0:+0.0;-0.0;0.0} dB"/>
+                        <TextBlock Style="{StaticResource MutedText}" TextWrapping="Wrap" Margin="0,4,0,0"
+                                   Text="Bass is around 100 Hz, voice around 1 kHz, treble around 8 kHz."/>
+
+                        <TextBlock Text="NOISE REDUCTION" Style="{StaticResource SectionTitle}"/>
+                        <controls:PropertySlider Label="Amount" Minimum="0" Maximum="100"
+                                                 Value="{Binding Inspector.NoiseReduction}" Format="{}{0:0}%"/>
+                        <TextBlock Style="{StaticResource MutedText}" TextWrapping="Wrap" Margin="0,4,0,0"
+                                   Text="Removes steady hiss and hum. Too much makes voices sound watery."/>
+                    </StackPanel>
+                </StackPanel>
+            </ScrollViewer>
+        </DockPanel>
+    </Border>
+</UserControl>

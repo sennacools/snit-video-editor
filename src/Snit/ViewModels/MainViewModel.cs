@@ -151,6 +151,9 @@ public partial class MainViewModel : ObservableObject, IDisposable
     /// <summary>Set by the window: takes a small picture of the monitor (for the export dialog).</summary>
     public Func<ImageSource?>? CapturePreview { get; set; }
 
+    /// <summary>A small copy of the program picture (width in pixels), for the scopes.</summary>
+    public Func<int, System.Windows.Media.Imaging.BitmapSource?>? CaptureFrame { get; set; }
+
     [ObservableProperty]
     private bool isPlaying;
 

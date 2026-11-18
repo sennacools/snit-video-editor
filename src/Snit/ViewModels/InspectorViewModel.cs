@@ -26,7 +26,8 @@ public partial class InspectorViewModel : ObservableObject
     {
         if (e.PropertyName is nameof(TimelineViewModel.SelectedClip) or "") Refresh();
         // Animated values change as the playhead moves.
-        else if (e.PropertyName == nameof(TimelineViewModel.PlayheadFrame) && VisualClip is { Keyframes.Count: > 0 }) Refresh();
+        else if (e.PropertyName == nameof(TimelineViewModel.PlayheadFrame)
+                 && (VisualClip is { Keyframes.Count: > 0 } || AudioClip is { Keyframes.Count: > 0 })) Refresh();
     }
 
     /// <summary>Re-read every value from the selected clip.</summary>
@@ -58,10 +59,79 @@ public partial class InspectorViewModel : ObservableObject
 
     public bool HasAudio => AudioClip is not null;
 
+    /// <summary>
+    /// The clip's volume. With volume keyframes it shows the value at the playhead, and changing
+    /// it sets a keyframe there (like the transform settings).
+    /// </summary>
     public double VolumeDb
     {
-        get => AudioClip?.VolumeDb ?? 0;
-        set => ChangeAudio(nameof(VolumeDb), c => c.VolumeDb = Math.Round(value, 1));
+        get
+        {
+            if (AudioClip is not Clip c) return 0;
+            return Core.Keyframes.Of(c.Keyframes, Core.Keyframes.Volume) is { } keys
+                ? Math.Round(Core.Keyframes.ValueAt(keys, AudioPlayheadInClip), 1)
+                : c.VolumeDb;
+        }
+        set
+        {
+            double v = Math.Round(value, 1);
+            if (AudioClip is Clip c && c.Keyframes.ContainsKey(Core.Keyframes.Volume))
+            {
+                long at = AudioPlayheadInClip;
+                ChangeAudio(nameof(VolumeDb), x => x.Keyframes = Core.Keyframes.Set(x.Keyframes, Core.Keyframes.Volume, at, v));
+            }
+            else ChangeAudio(nameof(VolumeDb), x => x.VolumeDb = v);
+        }
+    }
+
+    /// <summary>Where the playhead is inside the selected sound clip (frames from its start).</summary>
+    private long AudioPlayheadInClip => AudioClip is Clip c ? Math.Clamp(timeline.PlayheadFrame - c.Start, 0, Math.Max(0, c.Length - 1)) : 0;
+
+    /// <summary>The diamond next to the volume slider.</summary>
+    public KeyMark VolumeKey
+    {
+        get
+        {
+            if (AudioClip is not Clip c || Core.Keyframes.Of(c.Keyframes, Core.Keyframes.Volume) is not { } keys)
+                return new KeyMark("◇", false, "Animate the volume: set a keyframe at the playhead");
+            return keys.Any(k => k.Frame == AudioPlayheadInClip)
+                ? new KeyMark("◆", true, "Remove the volume keyframe at the playhead")
+                : new KeyMark("◇", true, "Add a volume keyframe at the playhead");
+        }
+    }
+
+    /// <summary>Volume diamond: start animating, add a keyframe here, or remove the one here.</summary>
+    [CommunityToolkit.Mvvm.Input.RelayCommand]
+    private void ToggleVolumeKeyframe()
+    {
+        if (AudioClip is not Clip clip) return;
+        long at = AudioPlayheadInClip;
+        double current = VolumeDb;
+        bool hereAlready = Core.Keyframes.Of(clip.Keyframes, Core.Keyframes.Volume)?.Any(k => k.Frame == at) == true;
+        ChangeAudio("volume-keyframe" + Guid.NewGuid(), c =>
+        {
+            if (!hereAlready)
+            {
+                c.Keyframes = Core.Keyframes.Set(c.Keyframes, Core.Keyframes.Volume, at, current);
+                return;
+            }
+            c.Keyframes = Core.Keyframes.Remove(c.Keyframes, Core.Keyframes.Volume, at);
+            if (!c.Keyframes.ContainsKey(Core.Keyframes.Volume)) c.VolumeDb = current; // keep the value it had
+        });
+    }
+
+    // Equaliser and noise reduction.
+    public double EqLow { get => AudioClip?.Audio.Low ?? 0; set => ChangeAudio(nameof(EqLow), c => c.Audio = c.Audio with { Low = Math.Round(value, 1) }); }
+    public double EqMid { get => AudioClip?.Audio.Mid ?? 0; set => ChangeAudio(nameof(EqMid), c => c.Audio = c.Audio with { Mid = Math.Round(value, 1) }); }
+    public double EqHigh { get => AudioClip?.Audio.High ?? 0; set => ChangeAudio(nameof(EqHigh), c => c.Audio = c.Audio with { High = Math.Round(value, 1) }); }
+    public double NoiseReduction { get => AudioClip?.Audio.NoiseReduction ?? 0; set => ChangeAudio(nameof(NoiseReduction), c => c.Audio = c.Audio with { NoiseReduction = Math.Round(value) }); }
+
+    /// <summary>Puts the equaliser and noise reduction back to off.</summary>
+    [CommunityToolkit.Mvvm.Input.RelayCommand]
+    private void ResetSoundTools()
+    {
+        if (AudioClip is { } clip && clip.Audio != ClipAudio.Default)
+            ChangeAudio("reset-sound" + Guid.NewGuid(), c => c.Audio = ClipAudio.Default);
     }
 
     public double FadeInSeconds
@@ -286,6 +356,34 @@ public partial class InspectorViewModel : ObservableObject
     public double Contrast { get => Look.Contrast; set => ChangeLook(nameof(Contrast), l => l with { Contrast = Math.Round(value) }); }
     public double Saturation { get => Look.Saturation; set => ChangeLook(nameof(Saturation), l => l with { Saturation = Math.Round(value) }); }
     public double Temperature { get => Look.Temperature; set => ChangeLook(nameof(Temperature), l => l with { Temperature = Math.Round(value) }); }
+    public double Tint { get => Look.Tint; set => ChangeLook(nameof(Tint), l => l with { Tint = Math.Round(value) }); }
+
+    // Colour wheels: puck position (-1..1) and the lightness slider under each wheel.
+    private static double R3(double v) => Math.Round(Math.Clamp(v, -1, 1), 3);
+    public double ShadowsX { get => Look.ShadowsX; set => ChangeLook("ShadowsPuck", l => l with { ShadowsX = R3(value) }); }
+    public double ShadowsY { get => Look.ShadowsY; set => ChangeLook("ShadowsPuck", l => l with { ShadowsY = R3(value) }); }
+    public double ShadowsLight { get => Look.ShadowsLight; set => ChangeLook(nameof(ShadowsLight), l => l with { ShadowsLight = R3(value) }); }
+    public double MidtonesX { get => Look.MidtonesX; set => ChangeLook("MidtonesPuck", l => l with { MidtonesX = R3(value) }); }
+    public double MidtonesY { get => Look.MidtonesY; set => ChangeLook("MidtonesPuck", l => l with { MidtonesY = R3(value) }); }
+    public double MidtonesLight { get => Look.MidtonesLight; set => ChangeLook(nameof(MidtonesLight), l => l with { MidtonesLight = R3(value) }); }
+    public double HighlightsX { get => Look.HighlightsX; set => ChangeLook("HighlightsPuck", l => l with { HighlightsX = R3(value) }); }
+    public double HighlightsY { get => Look.HighlightsY; set => ChangeLook("HighlightsPuck", l => l with { HighlightsY = R3(value) }); }
+    public double HighlightsLight { get => Look.HighlightsLight; set => ChangeLook(nameof(HighlightsLight), l => l with { HighlightsLight = R3(value) }); }
+
+    // Curves, as text ("" = straight).
+    public string CurveMaster { get => Look.CurveMaster; set => ChangeLook(nameof(CurveMaster), l => l with { CurveMaster = Clean(value) }); }
+    public string CurveRed { get => Look.CurveRed; set => ChangeLook(nameof(CurveRed), l => l with { CurveRed = Clean(value) }); }
+    public string CurveGreen { get => Look.CurveGreen; set => ChangeLook(nameof(CurveGreen), l => l with { CurveGreen = Clean(value) }); }
+    public string CurveBlue { get => Look.CurveBlue; set => ChangeLook(nameof(CurveBlue), l => l with { CurveBlue = Clean(value) }); }
+    private static string Clean(string? curve) => Curves.Format(Curves.Parse(curve));
+
+    /// <summary>Puts every colour setting (not size or position) back to normal.</summary>
+    [CommunityToolkit.Mvvm.Input.RelayCommand]
+    private void ResetColor()
+    {
+        if (VisualClip is Clip clip && clip.Look.HasColor)
+            ChangeLook(nameof(ResetColor) + Guid.NewGuid(), l => l.WithoutColor());
+    }
 
     /// <summary>The frame size, for the position sliders' range.</summary>
     public double FrameWidth => timeline.Project.Settings.Width;

@@ -1,4 +1,4 @@
-﻿using System.Windows.Controls;
+using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 
@@ -15,6 +15,20 @@ public partial class ProgramMonitorView : UserControl
     }
 
     /// <summary>A small still of what the monitor shows (without the guides), for the export dialog.</summary>
+    /// <summary>The program picture as it is shown now, drawn small (for the scopes). Null when not shown.</summary>
+    public BitmapSource? CaptureSmall(int width)
+    {
+        if (Picture.ActualWidth <= 0 || Picture.ActualHeight <= 0 || !Picture.IsVisible) return null;
+        int height = Math.Max(1, (int)Math.Round(width * Picture.ActualHeight / Picture.ActualWidth));
+        var visual = new DrawingVisual();
+        using (DrawingContext dc = visual.RenderOpen())
+            dc.DrawRectangle(new VisualBrush(Picture) { Stretch = Stretch.Fill }, null, new System.Windows.Rect(0, 0, width, height));
+        var bitmap = new RenderTargetBitmap(width, height, 96, 96, PixelFormats.Pbgra32);
+        bitmap.Render(visual);
+        bitmap.Freeze();
+        return bitmap;
+    }
+
     public ImageSource? Capture()
     {
         if (Picture.ActualWidth <= 0 || Picture.ActualHeight <= 0) return null;

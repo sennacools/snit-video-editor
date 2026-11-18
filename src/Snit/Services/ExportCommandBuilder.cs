@@ -98,7 +98,7 @@ public static class ExportCommandBuilder
             //    Pictures and titles keep their see-through parts.
             // Size, rotation, opacity and position: fixed, or changing every frame (keyframes).
             string transform, x, y;
-            if (clip.Keyframes.Count > 0)
+            if (Keyframes.AnimatesPicture(clip.Keyframes))
             {
                 (transform, x, y) = VideoFilters.AnimatedTransform(clip, w, h, fit, projectFps, clip.Start / projectFps);
                 x = $"'{x}'";
@@ -141,10 +141,11 @@ public static class ExportCommandBuilder
         if (!wantVideo) filters.Clear();
 
         // ---- Audio ----
-        var audioClips = project.Tracks.Where(t => t.Kind == TrackKind.Audio && !t.IsOff)
-            .SelectMany(t => TransitionPlan.Expand(t, projectFps)).Where(r => InRange(r.Clip)).ToList();
+        var audioClips = project.Tracks.Where(project.IsAudible)
+            .SelectMany(t => TransitionPlan.Expand(t, projectFps).Select(r => (Track: t, Render: r)))
+            .Where(x => InRange(x.Render.Clip)).ToList();
         var audioLabels = new List<string>();
-        foreach (RenderClip rc in wantAudio ? audioClips : [])
+        foreach (var (track, rc) in wantAudio ? audioClips : [])
         {
             Clip clip = rc.Clip;
             args.AddRange(["-ss", Sec(clip.In), "-t", Sec(clip.SourceLength), "-i", clip.Media.FilePath]);
@@ -155,7 +156,8 @@ public static class ExportCommandBuilder
             // Transitions fade the sound too (a cross-dissolve becomes a cross-fade).
             double fadeIn = Math.Max(clip.FadeInSeconds, (rc.FadeInFrames + rc.BlackInFrames) / projectFps);
             double fadeOut = Math.Max(clip.FadeOutSeconds, (rc.FadeOutFrames + rc.BlackOutFrames) / projectFps);
-            string effects = AudioFilters.ClipEffects(clip.VolumeDb, fadeIn, fadeOut, clip.Length / projectFps);
+            string effects = AudioFilters.ClipEffects(clip.VolumeDb, fadeIn, fadeOut, clip.Length / projectFps,
+                clip.Audio, AudioFilters.VolumeKeys(clip), projectFps, track.VolumeDb, track.Pan);
             filters.Add($"[{input}:a:0]aresample={SampleRate},aformat=channel_layouts=stereo{speed}{effects}," +
                         $"atrim=0:{Sec(clip.Length)},adelay={delayMs}:all=1[{label}]");
             audioLabels.Add(label);

@@ -114,6 +114,9 @@ public sealed class Clip
     /// <summary>Size, rotation, opacity, position and colour. Replaced as a whole (it never changes inside).</summary>
     public ClipLook Look { get; set; } = ClipLook.Default;
 
+    /// <summary>Equaliser and noise reduction (for clips on audio tracks).</summary>
+    public ClipAudio Audio { get; set; } = ClipAudio.Default;
+
     /// <summary>Effects (blur, crop, green screen…), applied top to bottom. Replaced as a whole when changed.</summary>
     public IReadOnlyList<ClipEffect> Effects { get; set; } = [];
 
@@ -203,10 +206,63 @@ public sealed record ClipLook
     /// <summary>-100 (cooler, bluer) to +100 (warmer, more orange).</summary>
     public double Temperature { get; init; }
 
+    /// <summary>-100 (greener) to +100 (more magenta).</summary>
+    public double Tint { get; init; }
+
+    // ---- Colour wheels (see ColorWheel): puck position -1..1 and lightness -1..1 ----
+
+    public double ShadowsX { get; init; }
+    public double ShadowsY { get; init; }
+    public double ShadowsLight { get; init; }
+    public double MidtonesX { get; init; }
+    public double MidtonesY { get; init; }
+    public double MidtonesLight { get; init; }
+    public double HighlightsX { get; init; }
+    public double HighlightsY { get; init; }
+    public double HighlightsLight { get; init; }
+
+    // ---- Curves (see Curves): "" = a straight line ----
+
+    public string CurveMaster { get; init; } = "";
+    public string CurveRed { get; init; } = "";
+    public string CurveGreen { get; init; } = "";
+    public string CurveBlue { get; init; } = "";
+
     public static ClipLook Default { get; } = new();
 
-    public bool HasColor => Exposure != 0 || Contrast != 0 || Saturation != 100 || Temperature != 0;
+    public bool HasWheels => ShadowsX != 0 || ShadowsY != 0 || ShadowsLight != 0 || MidtonesX != 0 || MidtonesY != 0
+                             || MidtonesLight != 0 || HighlightsX != 0 || HighlightsY != 0 || HighlightsLight != 0;
+    public bool HasCurves => CurveMaster != "" || CurveRed != "" || CurveGreen != "" || CurveBlue != "";
+
+    public bool HasColor => Exposure != 0 || Contrast != 0 || Saturation != 100 || Temperature != 0 || Tint != 0
+                            || HasWheels || HasCurves;
+
+    /// <summary>The same picture position, size and animation, but every colour setting back to normal.</summary>
+    public ClipLook WithoutColor() => Default with
+    {
+        Scale = Scale, Rotation = Rotation, Opacity = Opacity, PositionX = PositionX, PositionY = PositionY,
+    };
     public bool HasTransform => Scale != 100 || Rotation != 0 || Opacity != 100 || PositionX != 0 || PositionY != 0;
+}
+
+/// <summary>
+/// Sound tools for a clip: a three-band equaliser (dB, -12 to +12) and noise reduction
+/// (0 = off, 100 = strongest).
+/// </summary>
+public sealed record ClipAudio
+{
+    /// <summary>Bass (around 100 Hz).</summary>
+    public double Low { get; init; }
+
+    /// <summary>Voices (around 1 kHz).</summary>
+    public double Mid { get; init; }
+
+    /// <summary>Treble (around 8 kHz).</summary>
+    public double High { get; init; }
+
+    public double NoiseReduction { get; init; }
+
+    public static ClipAudio Default { get; } = new();
 }
 
 /// <summary>The text and look of a title clip.</summary>
@@ -249,6 +305,20 @@ public partial class Track : ObservableObject
     /// <summary>Locked tracks can't be edited.</summary>
     [ObservableProperty]
     private bool isLocked;
+
+    // ---- The audio mixer (sound tracks only) ----
+
+    /// <summary>The whole track louder or quieter, in dB (0 = unchanged).</summary>
+    [ObservableProperty]
+    private double volumeDb;
+
+    /// <summary>-1 = only the left speaker, 0 = both, 1 = only the right.</summary>
+    [ObservableProperty]
+    private double pan;
+
+    /// <summary>Solo: when any sound track is solo, only the solo tracks are heard.</summary>
+    [ObservableProperty]
+    private bool isSolo;
 }
 
 /// <summary>A marker on the timeline (M key): a remembered moment with a name.</summary>
@@ -271,6 +341,11 @@ public sealed class Project
         new Track { Name = "A1", Kind = TrackKind.Audio },
         new Track { Name = "A2", Kind = TrackKind.Audio },
     ];
+
+    /// <summary>Whether a sound track is heard: not muted, and solo when any track is solo.</summary>
+    public bool IsAudible(Track track)
+        => track.Kind == TrackKind.Audio && !track.IsOff
+           && (track.IsSolo || !Tracks.Any(t => t.Kind == TrackKind.Audio && t.IsSolo));
 
     public int VideoTrackCount => Tracks.Count(t => t.Kind == TrackKind.Video);
     public int AudioTrackCount => Tracks.Count(t => t.Kind == TrackKind.Audio);

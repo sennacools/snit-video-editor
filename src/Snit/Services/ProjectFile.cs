@@ -29,7 +29,8 @@ public static class ProjectFile
     private sealed record SettingsData(int Width, int Height, double FrameRate);
     private sealed record MediaData(Guid Id, string Path, string? RelativePath, MediaKind Kind,
         double Duration, int Width, int Height, double FrameRate, bool HasAudio);
-    private sealed record TrackData(string Name, bool IsOff, bool IsLocked, List<ClipData> Clips);
+    private sealed record TrackData(string Name, bool IsOff, bool IsLocked, List<ClipData> Clips,
+        double VolumeDb = 0, double Pan = 0, bool IsSolo = false);
     // A class (not a record) so that fields added later are simply 0 when opening older projects.
     private sealed class ClipData
     {
@@ -50,6 +51,7 @@ public static class ProjectFile
         public Transition? TransitionOut { get; init; }
         public Dictionary<string, List<Keyframe>>? Keyframes { get; init; }
         public List<ClipEffect>? Effects { get; init; }
+        public ClipAudio? Audio { get; init; }
     }
 
     /// <summary>The text and look of a title clip (titles have no media file).</summary>
@@ -90,12 +92,13 @@ public static class ProjectFile
                         TransitionIn = c.TransitionIn, TransitionOut = c.TransitionOut,
                         Keyframes = c.Keyframes.Count == 0 ? null : c.Keyframes.ToDictionary(p => p.Key, p => p.Value.ToList()),
                         Effects = c.Effects.Count == 0 ? null : c.Effects.ToList(),
+                        Audio = c.Audio == ClipAudio.Default ? null : c.Audio,
                         Title = c.Title is { } t ? new TitleData
                         {
                             Text = t.Text, FontFamily = t.FontFamily, FontSize = t.FontSize, Color = t.Color,
                             Bold = t.Bold, Shadow = t.Shadow, X = t.X, Y = t.Y,
                         } : null,
-                    }).ToList())).ToList(),
+                    }).ToList(), t.VolumeDb, t.Pan, t.IsSolo)).ToList(),
             project.InPoint, project.OutPoint, project.Markers);
 
         // Write to a temporary file first, so a crash halfway never leaves a broken project.
@@ -157,6 +160,9 @@ public static class ProjectFile
             Track track = project.EnsureTrack(t.Name); // adds V3, A3… when the project has them
             track.IsOff = t.IsOff;
             track.IsLocked = t.IsLocked;
+            track.VolumeDb = t.VolumeDb;
+            track.Pan = t.Pan;
+            track.IsSolo = t.IsSolo;
             foreach (var c in t.Clips)
             {
                 // Titles have no media file; they all use the stand-in "Title" item.
@@ -170,6 +176,7 @@ public static class ProjectFile
                     SpeedPercent = c.Speed > 0 ? c.Speed : 100, Reverse = c.Reverse,
                     TransitionIn = c.TransitionIn, TransitionOut = c.TransitionOut,
                     Effects = c.Effects ?? [],
+                    Audio = c.Audio ?? ClipAudio.Default,
                     Keyframes = c.Keyframes is null ? Core.Keyframes.None
                         : c.Keyframes.ToDictionary(p => p.Key, p => (IReadOnlyList<Keyframe>)p.Value.OrderBy(k => k.Frame).ToList()),
                     Title = c.Title is { } d ? new TitleStyle

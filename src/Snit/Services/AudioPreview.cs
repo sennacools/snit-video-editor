@@ -74,7 +74,8 @@ public sealed class AudioPreview : IDisposable
             // fades, and only then skip the part that is already behind us. That way a fade sounds
             // right even when you start halfway through it.
             string speed = VideoFilters.AudioSpeed(p.Speed, p.Reverse);
-            string effects = AudioFilters.ClipEffects(p.VolumeDb, p.FadeInSeconds, p.FadeOutSeconds, length);
+            string effects = AudioFilters.ClipEffects(p.VolumeDb, p.FadeInSeconds, p.FadeOutSeconds, length,
+                p.Audio, p.VolumeKeys, fps, p.TrackDb, p.Pan);
             string trim = skip > 0 ? $",atrim=start={ProcessRunner.Num(skip)},asetpts=PTS-STARTPTS" : "";
 
             args.AddRange(["-ss", ProcessRunner.Num(p.SourceStart / fps), "-t", ProcessRunner.Num(p.SourceFrames / fps), "-i", p.Path]);

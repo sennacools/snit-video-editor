@@ -59,7 +59,8 @@ public sealed record VideoSegment(
 /// <summary>One audio clip that should be heard during playback, with its volume, fades and speed.</summary>
 public sealed record AudioPiece(long Start, long End, string Path, long SourceStart,
     double VolumeDb = 0, double FadeInSeconds = 0, double FadeOutSeconds = 0,
-    double Speed = 1, bool Reverse = false, long SourceLength = 0)
+    double Speed = 1, bool Reverse = false, long SourceLength = 0,
+    ClipAudio? Audio = null, IReadOnlyList<Keyframe>? VolumeKeys = null, double TrackDb = 0, double Pan = 0)
 {
     public long SourceFrames => SourceLength > 0 ? SourceLength : End - Start;
 }
@@ -90,13 +91,17 @@ public static class PreviewPlan
     /// <summary>All clips on audio tracks that are not muted.</summary>
     public static IReadOnlyList<AudioPiece> BuildAudio(Project project)
         => project.Tracks
-            .Where(t => t.Kind == TrackKind.Audio && !t.IsOff)
-            .SelectMany(t => TransitionPlan.Expand(t, project.Fps))
-            .Where(r => !r.Clip.Media.IsOffline)
-            .Select(r => new AudioPiece(r.Clip.Start, r.Clip.End, r.Clip.Media.FilePath, r.Clip.In, r.Clip.VolumeDb,
+            .Where(project.IsAudible)
+            .SelectMany(t => TransitionPlan.Expand(t, project.Fps)
+                .Where(r => !r.Clip.Media.IsOffline)
+                .Select(r => Piece(project, t, r)))
+            .ToList();
+
+    private static AudioPiece Piece(Project project, Track track, RenderClip r)
+        => new AudioPiece(r.Clip.Start, r.Clip.End, r.Clip.Media.FilePath, r.Clip.In, r.Clip.VolumeDb,
                 // Transitions fade the sound as well (same rule as the export).
                 Math.Max(r.Clip.FadeInSeconds, (r.FadeInFrames + r.BlackInFrames) / project.Fps),
                 Math.Max(r.Clip.FadeOutSeconds, (r.FadeOutFrames + r.BlackOutFrames) / project.Fps),
-                r.Clip.Speed, r.Clip.Reverse, r.Clip.SourceLength))
-            .ToList();
+                r.Clip.Speed, r.Clip.Reverse, r.Clip.SourceLength,
+                r.Clip.Audio, Keyframes.Of(r.Clip.Keyframes, Keyframes.Volume), track.VolumeDb, track.Pan);
 }

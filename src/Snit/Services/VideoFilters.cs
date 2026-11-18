@@ -24,12 +24,51 @@ public static class VideoFilters
             parts.Add($"colorchannelmixer=rr={N(gain * (1 + warm))}:gg={N(gain * (1 + warm * 0.15))}:bb={N(gain * (1 - warm))}");
         }
 
+        if (look.Tint != 0)
+        {
+            // Tint: more magenta = less green (and the other way round).
+            double t = look.Tint / 100 * 0.15;
+            parts.Add($"colorchannelmixer=rr={N(1 + t * 0.5)}:gg={N(1 - t)}:bb={N(1 + t * 0.5)}");
+        }
+
         if (look.Contrast != 0 || look.Saturation != 100)
         {
             // eq: contrast 1 = unchanged (we use 0.2–1.8), saturation 1 = unchanged (0 = grey).
             double contrast = 1 + look.Contrast / 100 * 0.8;
             double saturation = look.Saturation / 100;
             parts.Add($"eq=contrast={N(contrast)}:saturation={N(saturation)}");
+        }
+
+        if (look.HasWheels)
+        {
+            // colorbalance adds red/green/blue to the shadows (s), midtones (m) and highlights (h).
+            // The puck gives the colour; the lightness slider adds the same to all three.
+            static string Wheel(string range, double x, double y, double light)
+            {
+                var (r, g, b) = ColorWheel.Shift(x, y);
+                double l = light * 0.4;
+                static string C(double v) => N(Math.Clamp(v, -1, 1));
+                return $"r{range}={C(r + l)}:g{range}={C(g + l)}:b{range}={C(b + l)}";
+            }
+            parts.Add("colorbalance=" + string.Join(":",
+                Wheel("s", look.ShadowsX, look.ShadowsY, look.ShadowsLight),
+                Wheel("m", look.MidtonesX, look.MidtonesY, look.MidtonesLight),
+                Wheel("h", look.HighlightsX, look.HighlightsY, look.HighlightsLight)));
+        }
+
+        if (look.HasCurves)
+        {
+            var curves = new List<string>();
+            void Add(string name, string text)
+            {
+                string points = Curves.Format(Curves.Parse(text));
+                if (points != "") curves.Add($"{name}='{points}'");
+            }
+            Add("master", look.CurveMaster);
+            Add("red", look.CurveRed);
+            Add("green", look.CurveGreen);
+            Add("blue", look.CurveBlue);
+            if (curves.Count > 0) parts.Add("curves=" + string.Join(":", curves));
         }
 
         return parts.Count == 0 ? "" : "," + string.Join(",", parts);

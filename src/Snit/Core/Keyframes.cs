@@ -16,6 +16,17 @@ public static class Keyframes
     /// <summary>The settings that can be animated, by name.</summary>
     public static readonly string[] Animatable = ["Scale", "Rotation", "Opacity", "PositionX", "PositionY"];
 
+    /// <summary>The name for volume keyframes (in dB) on clips on sound tracks.</summary>
+    public const string Volume = "Volume";
+
+    /// <summary>The keyframes of one setting, or null when it isn't animated.</summary>
+    public static IReadOnlyList<Keyframe>? Of(IReadOnlyDictionary<string, IReadOnlyList<Keyframe>> keyframes, string name)
+        => keyframes.TryGetValue(name, out var keys) && keys.Count > 0 ? keys : null;
+
+    /// <summary>Whether a clip's picture is animated (volume keyframes don't count).</summary>
+    public static bool AnimatesPicture(IReadOnlyDictionary<string, IReadOnlyList<Keyframe>> keyframes)
+        => Animatable.Any(name => keyframes.TryGetValue(name, out var keys) && keys.Count > 0);
+
     public static IReadOnlyDictionary<string, IReadOnlyList<Keyframe>> None { get; } =
         new Dictionary<string, IReadOnlyList<Keyframe>>();
 

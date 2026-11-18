@@ -109,6 +109,32 @@ public sealed class Clip
     /// <summary>For title clips: the text and how it looks. Null for normal clips.</summary>
     public TitleStyle? Title { get; set; }
 
+    // ---- Picture settings (clips on video tracks) ----
+
+    /// <summary>Size, rotation, opacity, position and colour. Replaced as a whole (it never changes inside).</summary>
+    public ClipLook Look { get; set; } = ClipLook.Default;
+
+    // ---- Speed ----
+
+    /// <summary>100 = normal, 200 = twice as fast (half as long), 50 = slow motion.</summary>
+    public double SpeedPercent { get; set; } = 100;
+
+    /// <summary>Play the clip backwards.</summary>
+    public bool Reverse { get; set; }
+
+    public double Speed => SpeedPercent / 100;
+
+    /// <summary>How many frames of the source file the clip uses (more than <see cref="Length"/> when sped up).</summary>
+    public long SourceLength => Math.Max(1, (long)Math.Round(Length * Speed));
+
+    /// <summary>Which source frame is shown at a timeline frame, taking speed and reverse into account.</summary>
+    public long SourceFrameAt(long timelineFrame)
+    {
+        long step = (long)Math.Floor((timelineFrame - Start) * Speed + 1e-9);
+        step = Math.Clamp(step, 0, SourceLength - 1);
+        return Reverse ? In + SourceLength - 1 - step : In + step;
+    }
+
     public long End => Start + Length;
     public bool IsTitle => Title is not null;
     public string Name => Title is { } t ? FirstLine(t.Text) : Media.Name;
@@ -125,6 +151,45 @@ public sealed class Clip
         string line = text.Split('\n')[0].Trim();
         return line.Length == 0 ? "Title" : line;
     }
+}
+
+/// <summary>
+/// How a clip's picture is shown: transform (size, rotation, opacity, position) and colour.
+/// A record: to change something, make a new one, e.g. <c>clip.Look = clip.Look with { Scale = 50 }</c>.
+/// </summary>
+public sealed record ClipLook
+{
+    /// <summary>Size in percent (100 = fits the frame).</summary>
+    public double Scale { get; init; } = 100;
+
+    /// <summary>Degrees, clockwise.</summary>
+    public double Rotation { get; init; }
+
+    /// <summary>0 = invisible, 100 = solid.</summary>
+    public double Opacity { get; init; } = 100;
+
+    /// <summary>Moves the picture this many pixels right (measured in the project frame, e.g. 1920 wide).</summary>
+    public double PositionX { get; init; }
+
+    /// <summary>Moves the picture this many pixels down.</summary>
+    public double PositionY { get; init; }
+
+    /// <summary>Brightness in "stops": +1 = twice as bright, -1 = half.</summary>
+    public double Exposure { get; init; }
+
+    /// <summary>-100 (flat) to +100 (punchy).</summary>
+    public double Contrast { get; init; }
+
+    /// <summary>Colour strength in percent: 0 = black and white, 100 = normal, 200 = very colourful.</summary>
+    public double Saturation { get; init; } = 100;
+
+    /// <summary>-100 (cooler, bluer) to +100 (warmer, more orange).</summary>
+    public double Temperature { get; init; }
+
+    public static ClipLook Default { get; } = new();
+
+    public bool HasColor => Exposure != 0 || Contrast != 0 || Saturation != 100 || Temperature != 0;
+    public bool HasTransform => Scale != 100 || Rotation != 0 || Opacity != 100 || PositionX != 0 || PositionY != 0;
 }
 
 /// <summary>The text and look of a title clip.</summary>

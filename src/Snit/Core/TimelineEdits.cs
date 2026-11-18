@@ -4,6 +4,54 @@ namespace Snit.Core;
 public static class TimelineEdits
 {
     /// <summary>
+    /// Moves a clip's start and/or end edge on the timeline (positive = to the right), and keeps
+    /// the source in step: cutting off the start of a normal clip skips the first part of the file,
+    /// but for a reversed clip the start shows the END of the file, so that part goes instead.
+    /// Speed is included: at 200%, one timeline frame is two source frames.
+    /// </summary>
+    public static void MoveEdges(Clip clip, long startDelta, long endDelta)
+    {
+        double speed = clip.Speed;
+        long sourceStart = clip.In;
+        long sourceEnd = clip.In + clip.SourceLength;
+        long startChange = (long)Math.Round(startDelta * speed);
+        long endChange = (long)Math.Round(endDelta * speed);
+
+        if (!clip.Reverse)
+        {
+            sourceStart += startChange; // the clip's start shows the start of the source
+            sourceEnd += endChange;
+        }
+        else
+        {
+            sourceEnd -= startChange;   // the clip's start shows the end of the source
+            sourceStart -= endChange;
+        }
+
+        clip.Start += startDelta;
+        clip.Length += endDelta - startDelta;
+        clip.In = Math.Max(0, sourceStart);
+    }
+
+    /// <summary>
+    /// How many timeline frames a clip's edges can be dragged outwards before running out of
+    /// source file. Pictures and titles can be stretched as far as you like.
+    /// </summary>
+    public static (long BeforeStart, long AfterEnd) RoomToGrow(Clip clip, double fps)
+    {
+        const long unlimited = long.MaxValue / 4;
+        if (clip.Media.Kind is MediaKind.Image or MediaKind.Text) return (unlimited, unlimited);
+
+        long mediaLength = clip.Media.LengthInFrames(fps);
+        long unusedAtFileStart = clip.In;
+        long unusedAtFileEnd = Math.Max(0, mediaLength - (clip.In + clip.SourceLength));
+        // A reversed clip's start shows the end of the file, and its end the start of the file.
+        long before = clip.Reverse ? unusedAtFileEnd : unusedAtFileStart;
+        long after = clip.Reverse ? unusedAtFileStart : unusedAtFileEnd;
+        return ((long)Math.Floor(before / clip.Speed), (long)Math.Floor(after / clip.Speed));
+    }
+
+    /// <summary>
     /// "Overwrite" edit: makes room for the range [start, end) on a track by cutting away
     /// whatever is there. Clips in <paramref name="keep"/> are left alone (the ones being placed).
     /// </summary>
@@ -28,26 +76,22 @@ public static class TimelineEdits
                 var right = other.Copy();
                 right.Id = Guid.NewGuid();
                 right.LinkId = null; // the right piece has no partner of its own
-                right.Start = end;
-                right.In = other.In + (end - other.Start);
-                right.Length = other.End - end;
+                MoveEdges(right, end - right.Start, 0);
                 right.FadeInSeconds = 0;
                 track.Clips.Add(right);
-                other.Length = start - other.Start;
+
+                MoveEdges(other, 0, start - other.End);
                 other.FadeOutSeconds = 0;
             }
             else if (!startsInside)
             {
                 // Only its tail is in the way: shorten it.
-                other.Length = start - other.Start;
+                MoveEdges(other, 0, start - other.End);
             }
             else
             {
                 // Only its head is in the way: cut off the beginning.
-                long cut = end - other.Start;
-                other.Start = end;
-                other.In += cut;
-                other.Length -= cut;
+                MoveEdges(other, end - other.Start, 0);
             }
         }
     }
@@ -58,14 +102,11 @@ public static class TimelineEdits
         if (frame <= clip.Start || frame >= clip.End)
             return null;
 
-        long leftLength = frame - clip.Start;
         var right = clip.Copy();
         right.Id = Guid.NewGuid();
-        right.Start = frame;
-        right.In = clip.In + leftLength;
-        right.Length = clip.Length - leftLength;
+        MoveEdges(right, frame - right.Start, 0); // right piece: everything after the cut
+        MoveEdges(clip, 0, frame - clip.End);     // left piece: everything before it
 
-        clip.Length = leftLength;
         // The fade-in stays at the very start and the fade-out at the very end, not at the cut.
         clip.FadeOutSeconds = 0;
         right.FadeInSeconds = 0;

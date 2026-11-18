@@ -593,24 +593,25 @@ public partial class TimelineViewModel : ObservableObject
         long snapped = Snap(mouseFrame, ignore, out long distance);
         ShowSnapLine(distance != long.MaxValue ? snapped : null);
 
-        // How far the edge moves, kept within what the source file allows.
+        // Start again from how the clips were when the drag began.
+        foreach (var o in dragOriginals)
+            (o.Clip.Start, o.Clip.In, o.Clip.Length) = (o.Start, o.In, o.Length);
+
+        // How far the edge moves, kept within what the source file allows (speed and reverse included),
+        // never before frame 0, and never shorter than one frame.
         long edge = trimLeft ? anchor.Start : anchor.Start + anchor.Length;
         long delta = snapped - edge;
         foreach (var o in dragOriginals)
         {
-            long mediaLength = o.Clip.Media.LengthInFrames(Fps);
+            var (before, after) = TimelineEdits.RoomToGrow(o.Clip, Fps);
             if (trimLeft)
             {
-                // Left edge: can go back until the start of the source file (and frame 0),
-                // and forward until the clip is one frame long.
-                long min = -Math.Min(o.In, trimRipple ? o.In : o.Start);
+                long min = -(trimRipple ? before : Math.Min(before, o.Start));
                 delta = Math.Clamp(delta, min, o.Length - 1);
             }
             else
             {
-                // Right edge: can go forward until the end of the source file.
-                long max = mediaLength == long.MaxValue ? long.MaxValue / 4 : mediaLength - (o.In + o.Length);
-                delta = Math.Clamp(delta, -(o.Length - 1), max);
+                delta = Math.Clamp(delta, -(o.Length - 1), after);
             }
         }
 
@@ -618,14 +619,13 @@ public partial class TimelineViewModel : ObservableObject
         {
             if (trimLeft)
             {
-                o.Clip.In = o.In + delta;
-                o.Clip.Length = o.Length - delta;
-                // Normal trim: the clip's start moves. Ripple trim: the start stays, everything after slides.
-                o.Clip.Start = trimRipple ? o.Start : o.Start + delta;
+                TimelineEdits.MoveEdges(o.Clip, delta, 0);
+                // Ripple trim: the clip's start stays put and everything after it slides instead.
+                if (trimRipple) o.Clip.Start = o.Start;
             }
             else
             {
-                o.Clip.Length = o.Length + delta;
+                TimelineEdits.MoveEdges(o.Clip, 0, delta);
             }
         }
 

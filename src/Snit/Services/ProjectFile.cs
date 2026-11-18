@@ -42,6 +42,9 @@ public static class ProjectFile
         public double FadeIn { get; init; }
         public double FadeOut { get; init; }
         public TitleData? Title { get; init; }
+        public ClipLook? Look { get; init; }
+        public double Speed { get; init; } = 100; // older files have no speed: normal
+        public bool Reverse { get; init; }
     }
 
     /// <summary>The text and look of a title clip (titles have no media file).</summary>
@@ -76,6 +79,8 @@ public static class ProjectFile
                     {
                         Id = c.Id, MediaId = c.Media.Id, Start = c.Start, In = c.In, Length = c.Length, LinkId = c.LinkId,
                         VolumeDb = c.VolumeDb, FadeIn = c.FadeInSeconds, FadeOut = c.FadeOutSeconds,
+                        Look = c.Look == ClipLook.Default ? null : c.Look, // only written when changed
+                        Speed = c.SpeedPercent, Reverse = c.Reverse,
                         Title = c.Title is { } t ? new TitleData
                         {
                             Text = t.Text, FontFamily = t.FontFamily, FontSize = t.FontSize, Color = t.Color,
@@ -147,6 +152,8 @@ public static class ProjectFile
                 {
                     Id = c.Id, Media = media, Start = c.Start, In = c.In, Length = c.Length, LinkId = c.LinkId,
                     VolumeDb = c.VolumeDb, FadeInSeconds = c.FadeIn, FadeOutSeconds = c.FadeOut,
+                    Look = c.Look ?? ClipLook.Default,
+                    SpeedPercent = c.Speed > 0 ? c.Speed : 100, Reverse = c.Reverse,
                     Title = c.Title is { } d ? new TitleStyle
                     {
                         Text = d.Text, FontFamily = d.FontFamily, FontSize = d.FontSize, Color = d.Color,

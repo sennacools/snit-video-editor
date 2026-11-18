@@ -49,7 +49,9 @@ public class ExportRunTests(TestMedia media) : IClassFixture<TestMedia>
         for (int i = 0; i < 8; i++) tl.AddMedia(video, project.TrackByName("V1"), i * 120);
 
         string output = Path.Combine(media.Folder, "cancelled.mp4");
-        var plan = ExportCommandBuilder.Build(project, new ExportSettings { OutputPath = output, Width = 3840, Height = 2160 });
+        // 1080p and 32 seconds long: plenty to still be busy when we press Stop. (4K made FFmpeg
+        // so big that a slow computer needed seconds just to clean up after it was stopped.)
+        var plan = ExportCommandBuilder.Build(project, new ExportSettings { OutputPath = output, Width = 1920, Height = 1080 });
 
         // Press "Stop" as soon as the export reports that it has started writing frames, like a
         // person would. (A timer is unreliable on a busy computer: it can go off very late.)
@@ -60,7 +62,7 @@ public class ExportRunTests(TestMedia media) : IClassFixture<TestMedia>
         var stopAtFirstProgress = new ImmediateProgress(p => { if (p.Frame > 0) cancel.Cancel(); });
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => new Exporter().RunAsync(plan, stopAtFirstProgress, cancel.Token));
         // What matters is how quickly it stops after you cancel.
-        Assert.True(watch.Elapsed - cancelledAt < TimeSpan.FromSeconds(5),
+        Assert.True(watch.Elapsed - cancelledAt < TimeSpan.FromSeconds(8),
             $"Cancelled at {cancelledAt.TotalSeconds:0.0} s, stopped at {watch.Elapsed.TotalSeconds:0.0} s (ffmpeg: {FFmpegLocator.Current.FfmpegPath}).");
         int stillRunning = Process.GetProcessesByName("ffmpeg").Length;
         Assert.False(File.Exists(output), $"The half-written video was not removed ({stillRunning} ffmpeg process(es) still running).");

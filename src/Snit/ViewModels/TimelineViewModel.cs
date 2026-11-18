@@ -246,11 +246,16 @@ public partial class TimelineViewModel : ObservableObject
         NotifyContentChanged();
     }
 
+    /// <summary>Goes up by one with every new undo step, undo and redo. The inspector uses it
+    /// to make one whole slider drag a single undo step.</summary>
+    public int EditVersion { get; private set; }
+
     /// <summary>Call this right before changing clips.</summary>
     public void SaveUndoPoint()
     {
         undoStack.Push(TakeSnapshot());
         redoStack.Clear();
+        EditVersion++;
         RefreshCommands();
     }
 
@@ -268,6 +273,7 @@ public partial class TimelineViewModel : ObservableObject
     private void Undo()
     {
         if (undoStack.Count == 0) return;
+        EditVersion++;
         redoStack.Push(TakeSnapshot());
         RestoreSnapshot(undoStack.Pop());
         RefreshCommands();
@@ -277,6 +283,7 @@ public partial class TimelineViewModel : ObservableObject
     private void Redo()
     {
         if (redoStack.Count == 0) return;
+        EditVersion++;
         undoStack.Push(TakeSnapshot());
         RestoreSnapshot(redoStack.Pop());
         RefreshCommands();

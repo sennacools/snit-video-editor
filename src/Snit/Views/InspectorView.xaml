@@ -25,29 +25,39 @@
             </Border>
 
             <ScrollViewer VerticalScrollBarVisibility="Auto">
-                <!-- Greyed out until these effects exist (phases 4 and 5). -->
-                <StackPanel Margin="14,0,14,14" IsEnabled="False">
-                    <TextBlock Text="TRANSFORM" Style="{StaticResource SectionTitle}"/>
-                    <controls:PropertySlider Label="Scale" Minimum="0" Maximum="400" Value="100" Format="{}{0:0}%"/>
-                    <controls:PropertySlider Label="Rotation" Minimum="-180" Maximum="180" Value="0" Format="{}{0:0}°"/>
-                    <controls:PropertySlider Label="Opacity" Minimum="0" Maximum="100" Value="100" Format="{}{0:0}%"/>
-                    <controls:PropertySlider Label="Position X" Minimum="-1920" Maximum="1920" Value="0" Format="{}{0:0} px"/>
-                    <controls:PropertySlider Label="Position Y" Minimum="-1080" Maximum="1080" Value="0" Format="{}{0:0} px"/>
+                <StackPanel Margin="14,0,14,14">
+                    <!-- Transform and colour come in phase 5, so they are greyed out for now. -->
+                    <StackPanel IsEnabled="False">
+                        <TextBlock Text="TRANSFORM" Style="{StaticResource SectionTitle}"/>
+                        <controls:PropertySlider Label="Scale" Minimum="0" Maximum="400" Value="100" Format="{}{0:0}%"/>
+                        <controls:PropertySlider Label="Rotation" Minimum="-180" Maximum="180" Value="0" Format="{}{0:0}°"/>
+                        <controls:PropertySlider Label="Opacity" Minimum="0" Maximum="100" Value="100" Format="{}{0:0}%"/>
+                        <controls:PropertySlider Label="Position X" Minimum="-1920" Maximum="1920" Value="0" Format="{}{0:0} px"/>
+                        <controls:PropertySlider Label="Position Y" Minimum="-1080" Maximum="1080" Value="0" Format="{}{0:0} px"/>
 
-                    <TextBlock Text="COLOR" Style="{StaticResource SectionTitle}"/>
-                    <controls:PropertySlider Label="Exposure" Minimum="-3" Maximum="3" Value="0" Format="{}{0:+0.0;-0.0;0.0}"/>
-                    <controls:PropertySlider Label="Contrast" Minimum="-100" Maximum="100" Value="0" Format="{}{0:+0;-0;0}"/>
-                    <controls:PropertySlider Label="Saturation" Minimum="0" Maximum="200" Value="100" Format="{}{0:0}%"/>
-                    <controls:PropertySlider Label="Temperature" Minimum="-100" Maximum="100" Value="0" Format="{}{0:+0;-0;0}"/>
+                        <TextBlock Text="COLOR" Style="{StaticResource SectionTitle}"/>
+                        <controls:PropertySlider Label="Exposure" Minimum="-3" Maximum="3" Value="0" Format="{}{0:+0.0;-0.0;0.0}"/>
+                        <controls:PropertySlider Label="Contrast" Minimum="-100" Maximum="100" Value="0" Format="{}{0:+0;-0;0}"/>
+                        <controls:PropertySlider Label="Saturation" Minimum="0" Maximum="200" Value="100" Format="{}{0:0}%"/>
+                        <controls:PropertySlider Label="Temperature" Minimum="-100" Maximum="100" Value="0" Format="{}{0:+0;-0;0}"/>
+                    </StackPanel>
 
-                    <TextBlock Text="AUDIO" Style="{StaticResource SectionTitle}"/>
-                    <controls:PropertySlider Label="Volume" Minimum="-60" Maximum="12" Value="0" Format="{}{0:+0.0;-0.0;0.0} dB"/>
-                    <controls:PropertySlider Label="Fade in" Minimum="0" Maximum="5" Value="0" Format="{}{0:0.0} s"/>
-                    <controls:PropertySlider Label="Fade out" Minimum="0" Maximum="5" Value="0" Format="{}{0:0.0} s"/>
+                    <!-- Sound of the selected clip (or of the sound linked to a selected video). -->
+                    <StackPanel IsEnabled="{Binding Inspector.HasAudio}">
+                        <TextBlock Text="AUDIO" Style="{StaticResource SectionTitle}"/>
+                        <controls:PropertySlider Label="Volume" Minimum="-60" Maximum="12"
+                                                 Value="{Binding Inspector.VolumeDb}" Format="{}{0:+0.0;-0.0;0.0} dB"/>
+                        <controls:PropertySlider Label="Fade in" Minimum="0" Maximum="{Binding Inspector.FadeMaximum}"
+                                                 Value="{Binding Inspector.FadeInSeconds}" Format="{}{0:0.0} s"/>
+                        <controls:PropertySlider Label="Fade out" Minimum="0" Maximum="{Binding Inspector.FadeMaximum}"
+                                                 Value="{Binding Inspector.FadeOutSeconds}" Format="{}{0:0.0} s"/>
+                    </StackPanel>
 
-                    <TextBlock Text="SPEED" Style="{StaticResource SectionTitle}"/>
-                    <controls:PropertySlider Label="Speed" Minimum="10" Maximum="400" Value="100" Format="{}{0:0}%"/>
-                    <CheckBox Content="Reverse" Margin="0,8,0,0"/>
+                    <StackPanel IsEnabled="False">
+                        <TextBlock Text="SPEED" Style="{StaticResource SectionTitle}"/>
+                        <controls:PropertySlider Label="Speed" Minimum="10" Maximum="400" Value="100" Format="{}{0:0}%"/>
+                        <CheckBox Content="Reverse" Margin="0,8,0,0"/>
+                    </StackPanel>
                 </StackPanel>
             </ScrollViewer>
         </DockPanel>

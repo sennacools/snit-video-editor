@@ -26,6 +26,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
         project = new Project();
         Timeline = new TimelineViewModel(project);
         Bin = new MediaBinViewModel(project, Timeline);
+        Inspector = new InspectorViewModel(Timeline);
         playback = CreatePlayer(project);
 
         Timeline.ContentChanged += OnTimelineContentChanged;
@@ -34,6 +35,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
     public TimelineViewModel Timeline { get; }
     public MediaBinViewModel Bin { get; }
+    public InspectorViewModel Inspector { get; }
 
     // ===================== Title bar =====================
 

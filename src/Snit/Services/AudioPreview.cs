@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.IO;
 using NAudio.Wave;
+using NAudio.Wave.SampleProviders;
 using Snit.Core;
 
 namespace Snit.Services;
@@ -22,6 +23,9 @@ public sealed class AudioPreview : IDisposable
     private readonly WaveOut output;
     private volatile bool stopped;
 
+    /// <summary>Loudest sample (0–1) of the left and right channel just sent to the speakers. Called on the audio thread.</summary>
+    public event Action<float, float>? LevelsChanged;
+
     private AudioPreview(Process process)
     {
         this.process = process;
@@ -29,9 +33,18 @@ public sealed class AudioPreview : IDisposable
         {
             DiscardOnBufferOverflow = true,
         };
+        // The meter looks at the sound on its way to the speakers and reports the loudest
+        // sample of each channel about 30 times a second (for the level meters).
+        var meter = new MeteringSampleProvider(buffer.ToSampleProvider(), SampleRate / 30);
+        meter.StreamVolume += (_, e) =>
+        {
+            if (e.MaxSampleValues is { Length: > 0 } peaks)
+                LevelsChanged?.Invoke(peaks[0], peaks.Length > 1 ? peaks[1] : peaks[0]);
+        };
+
         // Two buffers of 50 ms each: about 0.1 s between "play" and hearing it.
         output = new WaveOut { BufferMilliseconds = (int)(LatencySeconds * 1000 / 2), NumberOfBuffers = 2 };
-        output.Init(buffer);
+        output.Init(meter.ToWaveProvider16());
         new Thread(ReadLoop) { IsBackground = true, Name = "Snit audio" }.Start();
     }
 

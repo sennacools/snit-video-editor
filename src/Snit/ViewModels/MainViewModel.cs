@@ -67,6 +67,14 @@ public partial class MainViewModel : ObservableObject, IDisposable
     [ObservableProperty]
     private bool isPlaying;
 
+    /// <summary>Sound level of the left channel for the meters (loudest sample, 0–1).</summary>
+    [ObservableProperty]
+    private double levelLeft;
+
+    /// <summary>Sound level of the right channel for the meters (loudest sample, 0–1).</summary>
+    [ObservableProperty]
+    private double levelRight;
+
     private PlaybackEngine CreatePlayer(Project p)
     {
         var engine = new PlaybackEngine(p.Settings);
@@ -78,6 +86,11 @@ public partial class MainViewModel : ObservableObject, IDisposable
             Timeline.KeepPlayheadVisible();
         };
         engine.Stopped += () => IsPlaying = false;
+        engine.LevelsChanged += (left, right) =>
+        {
+            LevelLeft = left;
+            LevelRight = right;
+        };
         engine.UpdateTimeline(p);
         engine.Seek(Timeline.PlayheadFrame);
         return engine;

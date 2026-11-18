@@ -54,6 +54,23 @@ public sealed class PlaybackEngine : IDisposable
     /// <summary>Playback stopped by itself or by Stop() (called on the UI thread).</summary>
     public event Action? Stopped;
 
+    /// <summary>Sound levels (loudest sample, 0–1) of left and right during playback (called on the UI thread).</summary>
+    public event Action<float, float>? LevelsChanged;
+
+    private long pendingLevels = -1; // both levels packed in one number, so they travel together
+
+    private void ReportLevels(float left, float right)
+    {
+        long packed = ((long)BitConverter.SingleToInt32Bits(left) << 32) | (uint)BitConverter.SingleToInt32Bits(right);
+        if (Interlocked.Exchange(ref pendingLevels, packed) == -1)
+            ui.BeginInvoke(() =>
+            {
+                long p = Interlocked.Exchange(ref pendingLevels, -1);
+                if (p != -1)
+                    LevelsChanged?.Invoke(BitConverter.Int32BitsToSingle((int)(p >> 32)), BitConverter.Int32BitsToSingle((int)p));
+            });
+    }
+
     /// <param name="previewWidth">Preview width in pixels. Height follows the project's shape.</param>
     public PlaybackEngine(ProjectSettings settings, int previewWidth = 960)
     {
@@ -135,6 +152,7 @@ public sealed class PlaybackEngine : IDisposable
 
         Show(from);
         using AudioPreview? audio = SafeStartAudio(from);
+        if (audio is not null) audio.LevelsChanged += ReportLevels;
 
         IsPlaying = true;
         var clock = Stopwatch.StartNew();
@@ -178,6 +196,8 @@ public sealed class PlaybackEngine : IDisposable
 
         IsPlaying = false;
         stopRequest = false;
+        if (audio is not null) audio.LevelsChanged -= ReportLevels;
+        ReportLevels(0, 0); // meters fall back to silence
         if (Interlocked.Read(ref playRequest) < 0)
             ui.BeginInvoke(() => Stopped?.Invoke());
     }

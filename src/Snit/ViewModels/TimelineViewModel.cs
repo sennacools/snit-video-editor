@@ -894,6 +894,181 @@ public partial class TimelineViewModel : ObservableObject
         NotifyContentChanged();
     }
 
+    // ===================== Rolling edit, slip, slide, rate stretch (drag) =====================
+    // All four remember the clips as they were at the start of the drag; every mouse move starts
+    // again from there, so nothing drifts. Linked partners (a video's sound) do the same.
+
+    private sealed record Before(Clip Clip, long Start, long In, long Length, double Speed);
+
+    private List<Before> toolBefore = [];
+    private string? toolMode;
+    private Clip? toolLeft, toolRight;   // roll: the clips on each side of the cut; slide: the clip itself in toolLeft
+    private bool toolLeftEdge;
+
+    private Before Remember(Clip c) => new(c, c.Start, c.In, c.Length, c.SpeedPercent);
+
+    private void Restore()
+    {
+        foreach (var b in toolBefore)
+            (b.Clip.Start, b.Clip.In, b.Clip.Length, b.Clip.SpeedPercent) = (b.Start, b.In, b.Length, b.Speed);
+    }
+
+    private List<Clip> Group(Clip c) => Project.LinkedGroup(c).Where(x => !IsLocked(x)).ToList();
+
+    /// <summary>The partner of <paramref name="c"/> (its linked clip) on another track, matching <paramref name="like"/>'s group.</summary>
+    private static Clip? PartnerOf(Clip c, List<Clip> group) => group.FirstOrDefault(x => x.LinkId == c.LinkId && x != c);
+
+    /// <summary>Rolling edit: drag the cut between two touching clips.</summary>
+    public void BeginRoll(Clip left, Clip right)
+    {
+        SaveUndoPoint();
+        toolMode = "Roll";
+        toolLeft = left;
+        toolRight = right;
+        toolBefore = Group(left).Concat(Group(right)).Distinct().Select(Remember).ToList();
+    }
+
+    /// <summary>Slip: drag inside a clip to change which part of its file it shows.</summary>
+    public void BeginSlip(Clip clip)
+    {
+        SaveUndoPoint();
+        toolMode = "Slip";
+        toolLeft = clip;
+        toolBefore = Group(clip).Select(Remember).ToList();
+    }
+
+    /// <summary>Slide: drag a clip between its neighbours; they get shorter/longer so no gap appears.</summary>
+    public void BeginSlide(Clip clip)
+    {
+        SaveUndoPoint();
+        toolMode = "Slide";
+        toolLeft = clip;
+        var involved = new List<Clip>();
+        foreach (Clip c in Group(clip))
+        {
+            involved.Add(c);
+            if (PreviousClipAtCut(c) is Clip before && !IsLocked(before)) involved.Add(before);
+            if (NextClipAtCut(c) is Clip after && !IsLocked(after)) involved.Add(after);
+        }
+        toolBefore = involved.Distinct().Select(Remember).ToList();
+    }
+
+    /// <summary>Rate stretch: drag a clip's edge; it keeps showing the same part of its file, faster or slower.</summary>
+    public void BeginRateStretch(Clip clip, bool leftEdge)
+    {
+        SaveUndoPoint();
+        toolMode = "Rate";
+        toolLeft = clip;
+        toolLeftEdge = leftEdge;
+        toolBefore = Group(clip).Where(CanChangeSpeed).Select(Remember).ToList();
+    }
+
+    /// <summary>The mouse moved <paramref name="delta"/> frames since the drag began.</summary>
+    public void UpdateTool(long delta)
+    {
+        if (toolMode is null || toolLeft is null) return;
+        Restore();
+
+        switch (toolMode)
+        {
+            case "Roll" when toolRight is not null:
+            {
+                // The cut moves; each pair of clips at the cut changes together.
+                var pairs = new List<(Clip L, Clip R)> { (toolLeft, toolRight) };
+                foreach (Clip l in Group(toolLeft).Where(x => x != toolLeft))
+                    if (NextClipAtCut(l) is Clip r && Group(toolRight).Contains(r)) pairs.Add((l, r));
+                foreach (var (l, r) in pairs)
+                {
+                    var (_, leftAfter) = TimelineEdits.RoomToGrow(l, Fps);
+                    var (rightBefore, _) = TimelineEdits.RoomToGrow(r, Fps);
+                    delta = Math.Clamp(delta, -Math.Min(l.Length - 1, rightBefore), Math.Min(r.Length - 1, leftAfter));
+                }
+                foreach (var (l, r) in pairs)
+                {
+                    TimelineEdits.MoveEdges(l, 0, delta);
+                    TimelineEdits.MoveEdges(r, delta, 0);
+                }
+                ShowSnapLine(toolLeft.End);
+                break;
+            }
+            case "Slip":
+            {
+                // Same place and length; the source moves the other way (drag right = earlier part of the file).
+                foreach (Clip c in Group(toolLeft))
+                {
+                    if (c.Media.Kind is MediaKind.Image or MediaKind.Text) continue;
+                    long media = c.Media.LengthInFrames(Fps);
+                    long shift = (long)Math.Round(-delta * c.Speed) * (c.Reverse ? -1 : 1);
+                    c.In = Math.Clamp(c.In + shift, 0, Math.Max(0, media - c.SourceLength));
+                }
+                break;
+            }
+            case "Slide":
+            {
+                foreach (Clip c in Group(toolLeft))
+                {
+                    Clip? before = PreviousClipAtCut(c);
+                    Clip? after = NextClipAtCut(c);
+                    // Limits: the neighbours must keep at least one frame and have footage to grow into.
+                    long min = before is null ? -c.Start : -(before.Length - 1);
+                    long max = after is null ? long.MaxValue / 4 : after.Length - 1;
+                    if (after is not null) min = Math.Max(min, -TimelineEdits.RoomToGrow(after, Fps).BeforeStart);
+                    if (before is not null) max = Math.Min(max, TimelineEdits.RoomToGrow(before, Fps).AfterEnd);
+                    delta = Math.Clamp(delta, min, max);
+                }
+                foreach (Clip c in Group(toolLeft))
+                {
+                    Clip? before = PreviousClipAtCut(c);
+                    Clip? after = NextClipAtCut(c);
+                    c.Start += delta;
+                    if (before is not null) TimelineEdits.MoveEdges(before, 0, delta);
+                    if (after is not null) TimelineEdits.MoveEdges(after, delta, 0);
+                }
+                break;
+            }
+            case "Rate":
+            {
+                foreach (var b in toolBefore)
+                {
+                    // New length from the drag; speed so that the same source frames fit in it.
+                    long source = (long)Math.Round(b.Length * b.Speed / 100);
+                    long length = toolLeftEdge ? b.Length - delta : b.Length + delta;
+                    long min = (long)Math.Ceiling(source / (MaxSpeedPercent / 100)), max = (long)Math.Floor(source / (MinSpeedPercent / 100));
+                    length = Math.Clamp(length, Math.Max(1, min), Math.Max(1, max));
+                    b.Clip.SpeedPercent = Math.Round(source * 100.0 / length, 2);
+                    b.Clip.Length = length;
+                    if (toolLeftEdge) b.Clip.Start = b.Start + b.Length - length;
+                }
+                break;
+            }
+        }
+        RedrawNeeded?.Invoke();
+    }
+
+    public void EndTool()
+    {
+        ShowSnapLine(null);
+        bool changed = toolBefore.Any(b => b.Clip.Start != b.Start || b.Clip.In != b.In || b.Clip.Length != b.Length || b.Clip.SpeedPercent != b.Speed);
+        if (changed)
+        {
+            // A rate-stretched clip that got longer may now cover its neighbour: overwrite like a trim.
+            if (toolMode == "Rate")
+            {
+                var stretched = toolBefore.Select(b => b.Clip).ToHashSet();
+                foreach (Clip c in stretched) TimelineEdits.ClearRange(Project.TrackOf(c), c.Start, c.End, stretched);
+            }
+            NotifyContentChanged();
+        }
+        else
+        {
+            DropUndoPoint();
+            RedrawNeeded?.Invoke();
+        }
+        toolBefore = [];
+        toolMode = null;
+        toolLeft = toolRight = null;
+    }
+
     // ===================== Trimming clip edges (drag) =====================
 
     private bool trimLeft;

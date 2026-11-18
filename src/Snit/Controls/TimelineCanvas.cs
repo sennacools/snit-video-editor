@@ -381,7 +381,11 @@ public class TimelineCanvas : FrameworkElement
 
     // ===================== Mouse =====================
 
-    private enum DragMode { None, Move, TrimLeft, TrimRight, Pan, Box }
+    private enum DragMode { None, Move, TrimLeft, TrimRight, Pan, Box, Tool }
+
+    // For the roll / slip / slide / rate-stretch tools: what was pressed.
+    private Clip? toolOther;
+    private bool toolEdgeLeft;
 
     // Box-select: the clips that were selected before the box (kept when Ctrl is held) and the box itself.
     private List<Clip> boxKeep = [];
@@ -429,6 +433,44 @@ public class TimelineCanvas : FrameworkElement
                     tl.ActiveTool = "Select"; // ready to move or trim the new title
                 }
                 return;
+
+            case "Roll":
+            {
+                // Press near a cut between two touching clips.
+                if (!clipUsable) return;
+                int side = EdgeAt(clip!, p.X);
+                Clip? left = side > 0 ? clip : side < 0 ? tl.PreviousClipAtCut(clip!) : null;
+                Clip? right = side > 0 ? tl.NextClipAtCut(clip!) : side < 0 ? clip : null;
+                if (left is null || right is null || tl.IsLocked(left) || tl.IsLocked(right)) return;
+                tl.Select(clip!, add: false);
+                pressedClip = left;
+                toolOther = right;
+                mode = DragMode.Tool;
+                CaptureMouse();
+                return;
+            }
+
+            case "Slip":
+            case "Slide":
+                if (!clipUsable) return;
+                tl.Select(clip!, add: false);
+                pressedClip = clip;
+                mode = DragMode.Tool;
+                CaptureMouse();
+                return;
+
+            case "Rate":
+            {
+                if (!clipUsable || !TimelineViewModel.CanChangeSpeed(clip!)) return;
+                int stretchSide = EdgeAt(clip!, p.X);
+                if (stretchSide == 0) return; // only the edges stretch
+                tl.Select(clip!, add: false);
+                pressedClip = clip;
+                toolEdgeLeft = stretchSide < 0;
+                mode = DragMode.Tool;
+                CaptureMouse();
+                return;
+            }
 
             case "Razor":
                 if (clipUsable)
@@ -486,6 +528,15 @@ public class TimelineCanvas : FrameworkElement
             switch (mode)
             {
                 case DragMode.Move: tl.BeginMove(pressedClip!, tl.FrameAt(dragStartPoint.X)); break;
+                case DragMode.Tool:
+                    switch (tl.ActiveTool)
+                    {
+                        case "Roll": tl.BeginRoll(pressedClip!, toolOther!); break;
+                        case "Slip": tl.BeginSlip(pressedClip!); break;
+                        case "Slide": tl.BeginSlide(pressedClip!); break;
+                        case "Rate": tl.BeginRateStretch(pressedClip!, toolEdgeLeft); break;
+                    }
+                    break;
                 case DragMode.TrimLeft: tl.BeginTrim(pressedClip!, leftEdge: true, ripple: tl.ActiveTool == "Ripple"); break;
                 case DragMode.TrimRight: tl.BeginTrim(pressedClip!, leftEdge: false, ripple: tl.ActiveTool == "Ripple"); break;
             }
@@ -494,6 +545,7 @@ public class TimelineCanvas : FrameworkElement
         switch (mode)
         {
             case DragMode.Pan: tl.ScrollX = Math.Clamp(panStartScroll - (p.X - dragStartPoint.X), 0, tl.ScrollMaximum); break;
+            case DragMode.Tool: tl.UpdateTool(tl.FrameAt(p.X) - tl.FrameAt(dragStartPoint.X)); break;
             case DragMode.Box:
                 var r = new Rect(dragStartPoint, p);
                 box = r;
@@ -537,6 +589,7 @@ public class TimelineCanvas : FrameworkElement
         if (tl is null || !started) return;
 
         if (finished == DragMode.Move) tl.EndMove();
+        else if (finished == DragMode.Tool) tl.EndTool();
         else if (finished is DragMode.TrimLeft or DragMode.TrimRight) tl.EndTrim();
         else if (finished == DragMode.Box)
         {
@@ -575,6 +628,8 @@ public class TimelineCanvas : FrameworkElement
             "Hand" => Cursors.Hand,
             "Zoom" => Cursors.Cross,
             "Razor" => Cursors.Cross,
+            "Roll" or "Rate" => ClipAt(p) is Clip r && EdgeAt(r, p.X) != 0 ? Cursors.SizeWE : Cursors.Arrow,
+            "Slip" or "Slide" => ClipAt(p) is not null ? Cursors.ScrollWE : Cursors.Arrow,
             "Text" => Cursors.IBeam,
             _ => ClipAt(p) is Clip c && !tl.IsLocked(c) && EdgeAt(c, p.X) != 0 ? Cursors.SizeWE : Cursors.Arrow,
         };

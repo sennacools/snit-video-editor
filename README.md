@@ -131,3 +131,7 @@ isn't installed.
 To refresh the screenshot above: `dotnet run --project src/Snit -- --screenshot docs/screenshot.png`
 (you can put a `.snit` file before `--screenshot` to show a project).
 To export a project without opening the dialog: `Snit.exe project.snit --export video.mp4`.
+
+## License
+
+Snit is released under the [MIT License](LICENSE). FFmpeg and NAudio have their own licenses.

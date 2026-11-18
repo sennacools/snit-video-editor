@@ -66,7 +66,8 @@ public static class ProjectFile
 
     // ---- Save ----
 
-    public static void Save(Project project, string path)
+    /// <param name="remember">False for copies (auto-save): the project keeps its own file name.</param>
+    public static void Save(Project project, string path, bool remember = true)
     {
         string folder = Path.GetDirectoryName(Path.GetFullPath(path))!;
 
@@ -99,7 +100,7 @@ public static class ProjectFile
         string temp = path + ".tmp";
         File.WriteAllText(temp, JsonSerializer.Serialize(data, JsonOptions));
         File.Move(temp, path, overwrite: true);
-        project.FilePath = path;
+        if (remember) project.FilePath = path;
     }
 
     // ---- Open ----

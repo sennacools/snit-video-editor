@@ -57,6 +57,15 @@
                     <MenuItem Header="_File">
                         <MenuItem Header="New project" InputGestureText="Ctrl+N" Command="{Binding NewProjectCommand}"/>
                         <MenuItem Header="Open project…" InputGestureText="Ctrl+O" Command="{Binding OpenProjectCommand}"/>
+                        <MenuItem Header="Open recent" ItemsSource="{Binding RecentProjects}">
+                            <MenuItem.ItemContainerStyle>
+                                <Style TargetType="MenuItem" BasedOn="{StaticResource {x:Type MenuItem}}">
+                                    <Setter Property="Header" Value="{Binding}"/>
+                                    <Setter Property="Command" Value="{Binding DataContext.OpenRecentCommand, RelativeSource={RelativeSource AncestorType=Window}}"/>
+                                    <Setter Property="CommandParameter" Value="{Binding}"/>
+                                </Style>
+                            </MenuItem.ItemContainerStyle>
+                        </MenuItem>
                         <MenuItem Header="Save" InputGestureText="Ctrl+S" Command="{Binding SaveCommand}"/>
                         <MenuItem Header="Save as…" InputGestureText="Ctrl+Shift+S" Command="{Binding SaveAsCommand}"/>
                         <Separator/>
@@ -148,7 +157,7 @@
                 </StackPanel>
 
                 <!-- Project info, centred over the whole bar. Clicks go through to the bar so you can still drag. -->
-                <TextBlock Grid.ColumnSpan="6" Text="{Binding ProjectInfo}"
+                <TextBlock Grid.ColumnSpan="6" Text="{Binding ProjectInfo}" ToolTip="{Binding AutoSaveStatus}"
                            Foreground="{StaticResource MutedTextBrush}"
                            HorizontalAlignment="Center" VerticalAlignment="Center"
                            IsHitTestVisible="False"/>

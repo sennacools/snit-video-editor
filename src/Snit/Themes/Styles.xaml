@@ -685,10 +685,47 @@
         </ControlTemplate.Triggers>
     </ControlTemplate>
 
+    <!-- An entry that opens another list to the right (e.g. File → Open recent). -->
+    <ControlTemplate x:Key="SubmenuHeaderTemplate" TargetType="MenuItem">
+        <Grid>
+            <Border x:Name="Bd" Background="Transparent" CornerRadius="4" Padding="8,6">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="20"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <ContentPresenter Grid.Column="1" ContentSource="Header" RecognizesAccessKey="True" VerticalAlignment="Center"/>
+                    <TextBlock Grid.Column="2" Text="&#xE76C;" FontFamily="{StaticResource IconFont}" FontSize="9" Margin="24,0,0,0"
+                               Foreground="{StaticResource MutedTextBrush}" VerticalAlignment="Center"/>
+                </Grid>
+            </Border>
+            <Popup x:Name="PART_Popup" Placement="Right" HorizontalOffset="4" AllowsTransparency="True" Focusable="False"
+                   PopupAnimation="None" IsOpen="{Binding IsSubmenuOpen, RelativeSource={RelativeSource TemplatedParent}}">
+                <Border Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource BorderBrush}"
+                        BorderThickness="1" CornerRadius="6" Padding="4" MinWidth="220">
+                    <StackPanel IsItemsHost="True" KeyboardNavigation.DirectionalNavigation="Cycle"/>
+                </Border>
+            </Popup>
+        </Grid>
+        <ControlTemplate.Triggers>
+            <Trigger Property="IsHighlighted" Value="True">
+                <Setter TargetName="Bd" Property="Background" Value="{StaticResource ControlHoverBrush}"/>
+            </Trigger>
+            <Trigger Property="IsEnabled" Value="False">
+                <Setter Property="Opacity" Value="0.4"/>
+            </Trigger>
+        </ControlTemplate.Triggers>
+    </ControlTemplate>
+
     <Style TargetType="MenuItem">
         <Setter Property="Foreground" Value="{StaticResource SecondaryTextBrush}"/>
         <Setter Property="Template" Value="{StaticResource SubmenuItemTemplate}"/>
         <Style.Triggers>
+            <Trigger Property="Role" Value="SubmenuHeader">
+                <Setter Property="Template" Value="{StaticResource SubmenuHeaderTemplate}"/>
+                <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
+            </Trigger>
             <Trigger Property="Role" Value="TopLevelHeader">
                 <Setter Property="Template" Value="{StaticResource TopLevelMenuItemTemplate}"/>
             </Trigger>

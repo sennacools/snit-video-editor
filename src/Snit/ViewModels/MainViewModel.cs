@@ -32,11 +32,69 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
         Timeline.ContentChanged += OnTimelineContentChanged;
         Timeline.PropertyChanged += OnTimelinePropertyChanged;
+
+        settings = AppSettings.Load();
+        foreach (string recent in settings.RecentProjects.Where(File.Exists)) RecentProjects.Add(recent);
+
+        // Auto-save every two minutes while there are unsaved changes.
+        autoSaveTimer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMinutes(2) };
+        autoSaveTimer.Tick += (_, _) => AutoSaveNow();
+        autoSaveTimer.Start();
     }
 
     public TimelineViewModel Timeline { get; }
     public MediaBinViewModel Bin { get; }
     public InspectorViewModel Inspector { get; }
+
+    // ===================== Recent projects and auto-save =====================
+
+    private readonly AppSettings settings;
+    private readonly System.Windows.Threading.DispatcherTimer autoSaveTimer;
+
+    /// <summary>File → Open recent: the last projects you opened or saved (newest first).</summary>
+    public System.Collections.ObjectModel.ObservableCollection<string> RecentProjects { get; } = [];
+
+    /// <summary>"Auto-saved at 14:32", shown in the title bar's tooltip.</summary>
+    [ObservableProperty]
+    private string autoSaveStatus = "Not auto-saved yet";
+
+    private void RememberRecent(string path)
+    {
+        settings.AddRecent(path);
+        settings.Save();
+        RecentProjects.Clear();
+        foreach (string recent in settings.RecentProjects) RecentProjects.Add(recent);
+    }
+
+    [RelayCommand]
+    private void OpenRecent(string? path)
+    {
+        if (path is null || !ConfirmDiscardChanges()) return;
+        if (!File.Exists(path))
+        {
+            MessageBox.Show($"This project can't be found any more:\n{path}", "Open recent", MessageBoxButton.OK, MessageBoxImage.Warning);
+            settings.RecentProjects.Remove(path);
+            settings.Save();
+            RecentProjects.Remove(path);
+            return;
+        }
+        OpenProjectFile(path);
+    }
+
+    /// <summary>Writes the auto-save copy now (if there is anything unsaved).</summary>
+    public void AutoSaveNow()
+    {
+        if (!IsDirty) return;
+        try
+        {
+            AutoSave.Write(project);
+            AutoSaveStatus = $"Auto-saved at {DateTime.Now:HH:mm}";
+        }
+        catch (Exception ex)
+        {
+            AutoSaveStatus = "Auto-save failed: " + ex.Message;
+        }
+    }
     public SourceMonitorViewModel Source { get; }
 
     /// <summary>"Program" (the timeline) or "Source" (one file from the bin).</summary>
@@ -289,8 +347,19 @@ public partial class MainViewModel : ObservableObject, IDisposable
     {
         try
         {
-            Project loaded = ProjectFile.Load(path);
+            // Is there an auto-saved copy that is newer (for example after a crash)?
+            string openPath = path;
+            if (AutoSave.NewerCopyOf(path) is string copy &&
+                MessageBox.Show($"Snit found an auto-saved version of this project from {File.GetLastWriteTime(copy):d MMM HH:mm}, " +
+                                "newer than the saved one. Open the auto-saved version?",
+                    "Recover project", MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes)
+                openPath = copy;
+
+            Project loaded = ProjectFile.Load(openPath);
+            loaded.FilePath = path; // it stays this project, even when opened from the auto-save copy
+            RememberRecent(path);
             SwitchTo(loaded);
+            if (openPath != path) IsDirty = true; // recovered changes are not in the project file yet
 
             var missing = loaded.Media.Where(m => m.IsOffline).Select(m => m.FilePath).ToList();
             if (missing.Count > 0)
@@ -330,6 +399,9 @@ public partial class MainViewModel : ObservableObject, IDisposable
         try
         {
             ProjectFile.Save(project, path);
+            AutoSave.Delete(path);  // the real file is up to date now
+            AutoSave.Delete(null);  // and an unsaved "Untitled" copy is not needed any more
+            RememberRecent(path);
             IsDirty = false;
             OnPropertyChanged(nameof(ProjectName));
             OnPropertyChanged(nameof(ProjectInfo));

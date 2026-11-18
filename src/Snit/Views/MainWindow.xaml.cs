@@ -14,10 +14,20 @@ namespace Snit.Views;
 /// </summary>
 public partial class MainWindow : Window
 {
-    private readonly MainViewModel viewModel = new();
+    private readonly MainViewModel viewModel;
 
     public MainWindow()
     {
+        // The --screenshot and --export helpers must not touch your recent projects or auto-saves.
+        string[] args = Environment.GetCommandLineArgs();
+        if (args.Contains("--screenshot") || args.Contains("--export"))
+        {
+            string scratch = Path.Combine(Path.GetTempPath(), "snit-helper-run");
+            Services.AppSettings.Folder = scratch;
+            Services.AutoSave.Folder = Path.Combine(scratch, "AutoSave");
+        }
+        viewModel = new MainViewModel();
+
         InitializeComponent();
         DataContext = viewModel;
 

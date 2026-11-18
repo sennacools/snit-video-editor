@@ -1,28 +1,33 @@
 using System.Diagnostics;
-using System.Windows;
-using System.Windows.Media;
-using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using Snit.Core;
 
 namespace Snit.Services;
 
 /// <summary>
-/// The preview player. It owns the picture shown in the program monitor and runs on
-/// its own thread, so decoding never freezes the window.
+/// One track's picture at the current moment: the clip, and (for video and pictures) its
+/// decoded pixels. Titles have no pixels; the window draws them itself.
+/// </summary>
+public sealed record LayerFrame(VideoSegment Segment, DecodedFrame? Picture);
+
+/// <summary>
+/// The preview player. It runs on its own thread, so decoding never freezes the window.
+/// For every moment it decodes the clip under the playhead on each video track (skipping
+/// tracks hidden behind a full-screen video) and hands the window one "bundle" with a
+/// picture per track. The window stacks them with each clip's size, position and opacity.
 ///
 /// The window talks to it with three calls:
 ///   Seek(frame)  – show this frame (scrubbing, stepping)
 ///   Play(frame)  – play from here, with sound
 ///   Stop()       – pause
-/// and it reports back with PositionChanged (during playback) and Stopped.
+/// and it reports back with FrameReady, PositionChanged, LevelsChanged and Stopped.
 /// </summary>
 public sealed class PlaybackEngine : IDisposable
 {
     private readonly Dispatcher ui;
-    private readonly FramePool pool;
     private readonly FrameSource frames;
     private readonly double fps;
+    private readonly int frameWidth, frameHeight;
     private readonly Thread thread;
     private readonly AutoResetEvent wake = new(false);
     private volatile bool disposed;
@@ -33,20 +38,25 @@ public sealed class PlaybackEngine : IDisposable
     private volatile bool stopRequest;
 
     // A copy of the timeline for the player thread (replaced, never changed).
-    private volatile IReadOnlyList<VideoSegment> segments = [];
+    private volatile IReadOnlyList<IReadOnlyList<VideoSegment>> layers = [];
     private volatile IReadOnlyList<AudioPiece> audioPieces = [];
     private long durationFrames;
     private volatile bool timelineChanged;
 
-    // Handing frames to the window: only the newest frame waiting is kept.
-    private byte[]? waitingFrame;
+    // Handing pictures to the window: only the newest bundle waiting is kept.
+    private LayerFrame?[]? waitingBundle;
     private int drawScheduled;
     private string? lastShownKey;
 
-    /// <summary>The preview picture. The program monitor shows this.</summary>
-    public WriteableBitmap Bitmap { get; }
+    /// <summary>The size of the preview area (the project's shape, 960 pixels wide).</summary>
+    public int PreviewWidth { get; }
+    public int PreviewHeight { get; }
 
     public bool IsPlaying { get; private set; }
+
+    /// <summary>New pictures for the tracks, bottom track first (called on the UI thread).
+    /// Call <see cref="Release"/> when done with the bundle.</summary>
+    public event Action<LayerFrame?[]>? FrameReady;
 
     /// <summary>The playhead moved during playback (called on the UI thread).</summary>
     public event Action<long>? PositionChanged;
@@ -57,31 +67,16 @@ public sealed class PlaybackEngine : IDisposable
     /// <summary>Sound levels (loudest sample, 0–1) of left and right during playback (called on the UI thread).</summary>
     public event Action<float, float>? LevelsChanged;
 
-    private long pendingLevels = -1; // both levels packed in one number, so they travel together
-
-    private void ReportLevels(float left, float right)
-    {
-        long packed = ((long)BitConverter.SingleToInt32Bits(left) << 32) | (uint)BitConverter.SingleToInt32Bits(right);
-        if (Interlocked.Exchange(ref pendingLevels, packed) == -1)
-            ui.BeginInvoke(() =>
-            {
-                long p = Interlocked.Exchange(ref pendingLevels, -1);
-                if (p != -1)
-                    LevelsChanged?.Invoke(BitConverter.Int32BitsToSingle((int)(p >> 32)), BitConverter.Int32BitsToSingle((int)p));
-            });
-    }
-
     /// <param name="previewWidth">Preview width in pixels. Height follows the project's shape.</param>
     public PlaybackEngine(ProjectSettings settings, int previewWidth = 960)
     {
         ui = Dispatcher.CurrentDispatcher;
         fps = settings.FrameRate;
-
-        int width = previewWidth;
-        int height = (int)Math.Round(previewWidth * (double)settings.Height / settings.Width / 2) * 2; // even number
-        pool = new FramePool(width, height);
-        frames = new FrameSource(pool, fps);
-        Bitmap = new WriteableBitmap(width, height, 96, 96, PixelFormats.Bgr32, null);
+        frameWidth = settings.Width;
+        frameHeight = settings.Height;
+        PreviewWidth = previewWidth;
+        PreviewHeight = (int)Math.Round(previewWidth * (double)settings.Height / settings.Width / 2) * 2; // even number
+        frames = new FrameSource(PreviewWidth, PreviewHeight, fps);
 
         thread = new Thread(Run) { IsBackground = true, Name = "Snit playback" };
         thread.Start();
@@ -92,7 +87,7 @@ public sealed class PlaybackEngine : IDisposable
     /// <summary>Give the player a fresh copy of the timeline after an edit.</summary>
     public void UpdateTimeline(Project project)
     {
-        segments = PreviewPlan.BuildVideo(project);
+        layers = PreviewPlan.BuildLayers(project);
         audioPieces = PreviewPlan.BuildAudio(project);
         Interlocked.Exchange(ref durationFrames, project.DurationFrames);
         timelineChanged = true;
@@ -116,6 +111,13 @@ public sealed class PlaybackEngine : IDisposable
         stopRequest = true;
         Interlocked.Exchange(ref playRequest, -1);
         wake.Set();
+    }
+
+    /// <summary>Gives the bundle's picture buffers back for reuse.</summary>
+    public static void Release(LayerFrame?[] bundle)
+    {
+        foreach (LayerFrame? layer in bundle)
+            if (layer?.Picture is DecodedFrame p) p.Pool.Return(p.Pixels);
     }
 
     // ===================== The player thread =====================
@@ -184,7 +186,7 @@ public sealed class PlaybackEngine : IDisposable
             {
                 Show(frame);
                 ReportPosition(frame);
-                PrepareNextClip(frame);
+                PrepareNextClips(frame);
                 lastFrame = frame;
             }
 
@@ -217,54 +219,76 @@ public sealed class PlaybackEngine : IDisposable
     {
         if (!timelineChanged) return;
         timelineChanged = false;
-        frames.Reset();
-        lastShownKey = null;
+        lastShownKey = null; // redraw even if the frame number is the same
     }
 
-    /// <summary>Shortly before a cut, start reading the next clip so it's ready in time.</summary>
-    private void PrepareNextClip(long frame)
+    /// <summary>Shortly before a cut, start reading the next clip on each track so it's ready in time.</summary>
+    private void PrepareNextClips(long frame)
     {
-        var next = segments.FirstOrDefault(s => s.Start > frame);
-        if (next is not null && next.Start - frame <= fps)
-            frames.Prepare(next);
+        var current = layers;
+        for (int i = 0; i < current.Count; i++)
+        {
+            var next = current[i].FirstOrDefault(s => s.Start > frame);
+            if (next is not null && next.Start - frame <= fps)
+                frames.Prepare(next, i);
+        }
     }
 
-    /// <summary>Decode the picture for a timeline frame and hand it to the window.</summary>
+    /// <summary>Decode the pictures for a timeline frame and hand them to the window.</summary>
     private void Show(long frame)
     {
-        VideoSegment? segment = segments.FirstOrDefault(s => s.Start <= frame && frame < s.End);
-        string key = segment is null ? "black" : $"{segment.Path}|{segment.SourceFrameAt(frame)}";
-        if (key == lastShownKey) return; // already on screen
+        var current = layers;
+        var active = new VideoSegment?[current.Count];
 
-        byte[]? pixels = null;
-        if (segment is not null)
+        // From the top track down: stop once a clip hides everything below it.
+        for (int i = current.Count - 1; i >= 0; i--)
         {
-            try { pixels = frames.GetFrame(segment, segment.SourceFrameAt(frame)); }
-            catch (Exception ex) { Debug.WriteLine($"Decoding failed: {ex.Message}"); }
+            active[i] = current[i].FirstOrDefault(s => s.Start <= frame && frame < s.End);
+            if (active[i]?.CoversFrame(frameWidth, frameHeight) == true) break;
         }
-        pixels ??= pool.RentBlack();
+
+        // Skip the work if exactly the same thing is already on screen.
+        string key = string.Join("|", active.Select(s => s is null ? "-"
+            : $"{s.ClipId}:{(s.Kind is MediaKind.Video ? s.SourceFrameAt(frame) : 0)}:{s.Look.GetHashCode()}:{s.Title?.Text}"));
+        if (key == lastShownKey) return;
+
+        var bundle = new LayerFrame?[current.Count];
+        for (int i = 0; i < active.Length; i++)
+        {
+            VideoSegment? s = active[i];
+            if (s is null) continue;
+            if (s.Kind == MediaKind.Text)
+            {
+                bundle[i] = new LayerFrame(s, null); // the window draws titles
+                continue;
+            }
+            DecodedFrame? picture = null;
+            try { picture = frames.GetFrame(s, s.SourceFrameAt(frame), i); }
+            catch (Exception ex) { Debug.WriteLine($"Decoding failed: {ex.Message}"); }
+            if (picture is not null) bundle[i] = new LayerFrame(s, picture);
+        }
 
         lastShownKey = key;
-        HandToWindow(pixels);
+        HandToWindow(bundle);
     }
 
-    private void HandToWindow(byte[] pixels)
+    private void HandToWindow(LayerFrame?[] bundle)
     {
-        byte[]? older = Interlocked.Exchange(ref waitingFrame, pixels);
-        if (older is not null) pool.Return(older); // the window never got to show it; that's fine
+        LayerFrame?[]? older = Interlocked.Exchange(ref waitingBundle, bundle);
+        if (older is not null) Release(older); // the window never got to show it; that's fine
 
         if (Interlocked.Exchange(ref drawScheduled, 1) == 0)
-            ui.BeginInvoke(DispatcherPriority.Render, DrawWaitingFrame);
+            ui.BeginInvoke(DispatcherPriority.Render, DeliverWaitingBundle);
     }
 
     // Runs on the UI thread.
-    private void DrawWaitingFrame()
+    private void DeliverWaitingBundle()
     {
         Interlocked.Exchange(ref drawScheduled, 0);
-        byte[]? pixels = Interlocked.Exchange(ref waitingFrame, null);
-        if (pixels is null) return;
-        Bitmap.WritePixels(new Int32Rect(0, 0, pool.Width, pool.Height), pixels, pool.Stride, 0);
-        pool.Return(pixels);
+        LayerFrame?[]? bundle = Interlocked.Exchange(ref waitingBundle, null);
+        if (bundle is null) return;
+        if (FrameReady is null) Release(bundle);
+        else FrameReady(bundle);
     }
 
     private long reportedFrame = -1;
@@ -277,6 +301,20 @@ public sealed class PlaybackEngine : IDisposable
             {
                 long f = Interlocked.Exchange(ref reportedFrame, -1);
                 if (f >= 0) PositionChanged?.Invoke(f);
+            });
+    }
+
+    private long pendingLevels = -1; // both levels packed in one number, so they travel together
+
+    private void ReportLevels(float left, float right)
+    {
+        long packed = ((long)BitConverter.SingleToInt32Bits(left) << 32) | (uint)BitConverter.SingleToInt32Bits(right);
+        if (Interlocked.Exchange(ref pendingLevels, packed) == -1)
+            ui.BeginInvoke(() =>
+            {
+                long p = Interlocked.Exchange(ref pendingLevels, -1);
+                if (p != -1)
+                    LevelsChanged?.Invoke(BitConverter.Int32BitsToSingle((int)(p >> 32)), BitConverter.Int32BitsToSingle((int)p));
             });
     }
 

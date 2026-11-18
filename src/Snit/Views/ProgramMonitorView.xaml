@@ -57,25 +57,40 @@
             </Grid>
 
             <!--
-                The preview. Inside the Viewbox we work in real 1920×1080 pixels;
-                the Viewbox scales it down to fit and keeps the 16:9 shape.
+                The preview. Inside the Viewbox we work in real project pixels (1920×1080);
+                the Viewbox scales it down to fit and keeps the shape.
             -->
             <Viewbox Margin="20,20,20,4" Stretch="Uniform">
-                <Grid Width="1920" Height="1080" Background="Black">
-                    <Image Source="{Binding PreviewImage}" Stretch="Fill" RenderOptions.BitmapScalingMode="Linear"/>
-                    <!-- Titles, drawn on top of the picture -->
-                    <ItemsControl ItemsSource="{Binding TitleOverlays}" IsHitTestVisible="False">
-                        <ItemsControl.ItemsPanel>
-                            <ItemsPanelTemplate>
-                                <Grid/>
-                            </ItemsPanelTemplate>
-                        </ItemsControl.ItemsPanel>
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate>
-                                <Image Source="{Binding}" Stretch="Fill"/>
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
+                <Grid Width="{Binding FrameWidth}" Height="{Binding FrameHeight}">
+                    <!-- The picture: one layer per video track, V1 at the bottom. ClipToBounds cuts off
+                         anything moved or scaled past the frame edge, like the export does. -->
+                    <Grid x:Name="Picture" Background="Black" ClipToBounds="True">
+                        <ItemsControl ItemsSource="{Binding PreviewLayers}" IsHitTestVisible="False">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <Grid/>
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <!-- Centred, then sized, turned and moved around its middle. -->
+                                    <Image Source="{Binding Source}" Width="{Binding Width}" Height="{Binding Height}"
+                                           Stretch="Fill" Opacity="{Binding Opacity}"
+                                           HorizontalAlignment="Center" VerticalAlignment="Center"
+                                           RenderTransformOrigin="0.5,0.5" RenderOptions.BitmapScalingMode="Linear"
+                                           Visibility="{Binding IsVisible, Converter={StaticResource BoolToVisibility}}">
+                                        <Image.RenderTransform>
+                                            <TransformGroup>
+                                                <ScaleTransform ScaleX="{Binding Scale}" ScaleY="{Binding Scale}"/>
+                                                <RotateTransform Angle="{Binding Rotation}"/>
+                                                <TranslateTransform X="{Binding OffsetX}" Y="{Binding OffsetY}"/>
+                                            </TransformGroup>
+                                        </Image.RenderTransform>
+                                    </Image>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </Grid>
                     <Grid Visibility="{Binding ShowSafeGuides, Converter={StaticResource BoolToVisibility}}">
                         <!-- action-safe (5% in from each edge) and title-safe (10%) guides -->
                         <Rectangle Margin="96,54" Stroke="#38FFFFFF" StrokeThickness="3" StrokeDashArray="5 5"/>

@@ -22,6 +22,7 @@ public partial class MainWindow : Window
         DataContext = viewModel;
 
         viewModel.ExportRequested += exportViewModel => new ExportWindow(exportViewModel) { Owner = this }.ShowDialog();
+        viewModel.CapturePreview = () => Monitor.Capture();
         Loaded += OnLoaded;
         StateChanged += (_, _) => UpdateMaximizedLook();
         Closed += (_, _) => viewModel.Dispose();
@@ -45,6 +46,17 @@ public partial class MainWindow : Window
             await Task.Delay(1500); // give thumbnails and the preview a moment
             await Dispatcher.InvokeAsync(() => { }, System.Windows.Threading.DispatcherPriority.ApplicationIdle);
             ScreenshotHelper.SaveWindow(this, args[i + 1]);
+            viewModel.IsDirty = false;
+            Close();
+            return;
+        }
+
+        // Helper: "Snit.exe project.snit --export video.mp4" exports the project as 1080p MP4
+        // (the dialog's standard settings) and quits. Handy for checking and for scripts.
+        int x = Array.IndexOf(args, "--export");
+        if (x >= 0 && x + 1 < args.Length)
+        {
+            Environment.ExitCode = await viewModel.ExportWithoutDialogAsync(Path.GetFullPath(args[x + 1])) ? 0 : 1;
             viewModel.IsDirty = false;
             Close();
         }

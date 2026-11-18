@@ -184,19 +184,39 @@ public class TimelineTests
     }
 
     [Fact]
-    public void Preview_plan_shows_the_top_track_and_merges_continuous_pieces()
+    public void Preview_plan_has_one_layer_per_video_track_with_V1_at_the_bottom()
     {
         var (project, tl) = NewTimeline();
         tl.AddMedia(Video(10, audio: false), project.TrackByName("V1"), 0);   // 0-300
         tl.AddMedia(Picture(), project.TrackByName("V2"), 100);               // 100-250 on top
 
-        var segments = PreviewPlan.BuildVideo(project);
-        Assert.Equal(3, segments.Count);
-        Assert.Equal(MediaKind.Image, segments[1].Kind);
-        Assert.Equal(250, segments[2].Start);
-        Assert.Equal(250, segments[2].SourceStart);
+        var layers = PreviewPlan.BuildLayers(project);
+        Assert.Equal(2, layers.Count);
+        Assert.Equal(MediaKind.Video, Assert.Single(layers[0]).Kind);  // V1
+        Assert.Equal(MediaKind.Image, Assert.Single(layers[1]).Kind);  // V2
 
-        project.TrackByName("V2").IsOff = true; // hide V2: one continuous piece again
-        Assert.Single(PreviewPlan.BuildVideo(project));
+        project.TrackByName("V2").IsOff = true; // a hidden track keeps its place but is empty
+        layers = PreviewPlan.BuildLayers(project);
+        Assert.Equal(2, layers.Count);
+        Assert.Empty(layers[1]);
+    }
+
+    [Fact]
+    public void Only_a_normal_full_frame_video_hides_the_tracks_below()
+    {
+        var (project, tl) = NewTimeline();
+        var video = new MediaItem
+        {
+            FilePath = @"C:\fake\v.mp4", Kind = MediaKind.Video, DurationSeconds = 10, Width = 1920, Height = 1080, FrameRate = 30,
+        };
+        tl.AddMedia(video, project.TrackByName("V2"), 0);
+        VideoSegment Top() => PreviewPlan.BuildLayers(project)[1][0];
+
+        Assert.True(Top().CoversFrame(1920, 1080));
+        Clip clip = project.TrackByName("V2").Clips[0];
+        clip.Look = clip.Look with { Scale = 50 };
+        Assert.False(Top().CoversFrame(1920, 1080));   // smaller: you see what's below
+        clip.Look = ClipLook.Default with { Opacity = 99 };
+        Assert.False(Top().CoversFrame(1920, 1080));   // see-through
     }
 }

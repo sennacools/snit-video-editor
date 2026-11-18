@@ -21,7 +21,7 @@ public partial class ExportViewModel : ObservableObject
     private string? gpuEncoder;
     private string? exportedPath;
 
-    public ExportViewModel(Project project, ImageSource preview)
+    public ExportViewModel(Project project, ImageSource? preview)
     {
         this.project = project;
         Preview = preview;
@@ -41,7 +41,7 @@ public partial class ExportViewModel : ObservableObject
     /// <summary>The window closes itself when this fires.</summary>
     public event Action? CloseRequested;
 
-    public ImageSource Preview { get; }
+    public ImageSource? Preview { get; }
 
     // ===================== Settings =====================
 

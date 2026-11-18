@@ -59,10 +59,17 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
     // ===================== Preview and playback =====================
 
-    /// <summary>The picture in the program monitor.</summary>
-    public ImageSource PreviewImage => playback.Bitmap;
+    /// <summary>The pictures in the program monitor, one per video track (V1 first, so it is at the bottom).</summary>
+    public System.Collections.ObjectModel.ObservableCollection<PreviewLayer> PreviewLayers { get; } = [];
 
-    public string PreviewQualityText => $"Preview quality: {playback.Bitmap.PixelWidth}×{playback.Bitmap.PixelHeight} · Fit";
+    /// <summary>The project frame size; the monitor works in these pixels.</summary>
+    public int FrameWidth => project.Settings.Width;
+    public int FrameHeight => project.Settings.Height;
+
+    public string PreviewQualityText => $"Preview quality: {playback.PreviewWidth}×{playback.PreviewHeight} · Fit";
+
+    /// <summary>Set by the window: takes a small picture of the monitor (for the export dialog).</summary>
+    public Func<ImageSource?>? CapturePreview { get; set; }
 
     [ObservableProperty]
     private bool isPlaying;
@@ -91,48 +98,44 @@ public partial class MainViewModel : ObservableObject, IDisposable
             LevelLeft = left;
             LevelRight = right;
         };
+        engine.FrameReady += OnFrameReady;
         engine.UpdateTimeline(p);
         engine.Seek(Timeline.PlayheadFrame);
         return engine;
     }
 
-    // ===================== Titles on the preview =====================
-
-    /// <summary>The titles shown on top of the preview picture right now (bottom track first).</summary>
-    public System.Collections.ObjectModel.ObservableCollection<ImageSource> TitleOverlays { get; } = [];
+    // ===================== Showing the player's pictures =====================
 
     private readonly Dictionary<string, ImageSource> titlePictures = [];
-    private string shownTitlesKey = "";
 
-    /// <summary>Works out which titles are visible at the playhead and shows them.</summary>
-    private void UpdateTitleOverlays()
+    /// <summary>The player has new pictures: put each track's picture (or title) on its layer.</summary>
+    private void OnFrameReady(LayerFrame?[] bundle)
     {
-        var titles = PreviewPlan.TitlesAt(project, Timeline.PlayheadFrame);
-        var keys = titles.Select(c => TitleKey(c.Title!)).ToList();
-        string allKeys = string.Join("|", keys);
-        if (allKeys == shownTitlesKey) return; // nothing changed (most frames during playback)
-        shownTitlesKey = allKeys;
-
-        TitleOverlays.Clear();
-        for (int i = 0; i < titles.Count; i++)
+        while (PreviewLayers.Count < bundle.Length) PreviewLayers.Add(new PreviewLayer());
+        for (int i = 0; i < PreviewLayers.Count; i++)
         {
-            if (!titlePictures.TryGetValue(keys[i], out ImageSource? picture))
-            {
-                // Drawn once at the project size, then remembered.
-                if (titlePictures.Count > 50) titlePictures.Clear();
-                picture = TitleRenderer.Render(titles[i].Title!, project.Settings.Width, project.Settings.Height);
-                titlePictures[keys[i]] = picture;
-            }
-            TitleOverlays.Add(picture);
+            LayerFrame? layer = i < bundle.Length ? bundle[i] : null;
+            if (layer is null) PreviewLayers[i].Hide();
+            else if (layer.Segment.Title is TitleStyle title) PreviewLayers[i].ShowTitle(TitlePicture(title), layer.Segment, project.Settings);
+            else if (layer.Picture is DecodedFrame picture) PreviewLayers[i].ShowPicture(picture, layer.Segment, project.Settings);
         }
+        PlaybackEngine.Release(bundle);
     }
 
-    private static string TitleKey(TitleStyle s)
-        => $"{s.Text}\u0001{s.FontFamily}\u0001{s.FontSize}\u0001{s.Color}\u0001{s.Bold}\u0001{s.Shadow}\u0001{s.X}\u0001{s.Y}";
+    /// <summary>Titles are drawn once (per text and look) and then remembered.</summary>
+    private ImageSource TitlePicture(TitleStyle s)
+    {
+        string key = $"{s.Text}|{s.FontFamily}|{s.FontSize}|{s.Color}|{s.Bold}|{s.Shadow}|{s.X}|{s.Y}";
+        if (!titlePictures.TryGetValue(key, out ImageSource? picture))
+        {
+            if (titlePictures.Count > 50) titlePictures.Clear();
+            titlePictures[key] = picture = TitleRenderer.Render(s, project.Settings.Width, project.Settings.Height);
+        }
+        return picture;
+    }
 
     private void OnTimelineContentChanged()
     {
-        UpdateTitleOverlays();
         IsDirty = true;
         ExportCommand.NotifyCanExecuteChanged(); // Export is only possible with something on the timeline
         playback.UpdateTimeline(project);
@@ -142,7 +145,6 @@ public partial class MainViewModel : ObservableObject, IDisposable
     private void OnTimelinePropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (e.PropertyName != nameof(TimelineViewModel.PlayheadFrame)) return;
-        UpdateTitleOverlays(); // also during playback
         if (positionFromPlayer) return;
 
         // You moved the playhead (ruler, arrow keys...): show that frame, or keep playing from there.
@@ -293,9 +295,8 @@ public partial class MainViewModel : ObservableObject, IDisposable
         IsDirty = false;
         ExportCommand.NotifyCanExecuteChanged();
         titlePictures.Clear();
-        shownTitlesKey = "\u0002"; // force a refresh
-        UpdateTitleOverlays();
-        OnPropertyChanged(nameof(PreviewImage));
+        OnPropertyChanged(nameof(FrameWidth));
+        OnPropertyChanged(nameof(FrameHeight));
         OnPropertyChanged(nameof(PreviewQualityText));
         OnPropertyChanged(nameof(ProjectName));
         OnPropertyChanged(nameof(ProjectInfo));
@@ -319,7 +320,29 @@ public partial class MainViewModel : ObservableObject, IDisposable
             return;
         }
         if (IsPlaying) PlayPause();
-        ExportRequested?.Invoke(new ExportViewModel(project, PreviewImage));
+        ExportRequested?.Invoke(new ExportViewModel(project, CapturePreview?.Invoke()));
+    }
+
+    /// <summary>Exports with standard settings (1080p MP4, 30 fps project rate, 16 Mbps). Used by "--export".</summary>
+    public async Task<bool> ExportWithoutDialogAsync(string outputPath)
+    {
+        try
+        {
+            var settings = new ExportSettings
+            {
+                OutputPath = outputPath,
+                Width = project.Settings.Width,
+                Height = project.Settings.Height,
+                FrameRate = project.Fps,
+            };
+            await new Exporter().RunAsync(ExportCommandBuilder.Build(project, settings), null, CancellationToken.None);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine("Export failed: " + ex.Message);
+            return false;
+        }
     }
 
     // ===================== FFmpeg check =====================

@@ -22,16 +22,18 @@ public sealed class VideoDecoder : IDisposable
     /// <summary>The source frame number that the next <see cref="ReadNext"/> returns.</summary>
     public long NextFrame { get; private set; }
 
-    public VideoDecoder(string ffmpegPath, string file, long startFrame, double fps, FramePool pool)
+    /// <param name="colorFilter">The clip's colour recipe (see <see cref="VideoFilters.Color"/>), or "".</param>
+    public VideoDecoder(string ffmpegPath, string file, long startFrame, double fps, FramePool pool, string colorFilter = "")
     {
         this.pool = pool;
         NextFrame = startFrame;
 
         int w = pool.Width, h = pool.Height;
-        // Fit the picture inside the preview size and add black bars if the shape differs.
+        // Resize to the pool's size (which already has the clip's shape), apply the colours,
+        // and fill any leftover edge with see-through pixels so lower tracks show there.
         string filter = $"fps={ProcessRunner.Num(fps)}," +
-                        $"scale={w}:{h}:force_original_aspect_ratio=decrease," +
-                        $"pad={w}:{h}:(ow-iw)/2:(oh-ih)/2,setsar=1";
+                        $"scale={w}:{h}:force_original_aspect_ratio=decrease{colorFilter}," +
+                        $"pad={w}:{h}:(ow-iw)/2:(oh-ih)/2:color=black@0,setsar=1";
 
         process = ProcessRunner.StartStreaming(ffmpegPath,
         [

@@ -35,9 +35,10 @@ public class TitleTests(TestMedia media) : IClassFixture<TestMedia>
         var (project, tl) = NewTimeline();
         tl.AddMedia(MediaItem.Title, project.TrackByName("V2"), 0);
 
-        Assert.Empty(PreviewPlan.BuildVideo(project));              // no picture segment
-        Assert.Single(PreviewPlan.TitlesAt(project, 10));            // but visible as a title
-        Assert.Empty(PreviewPlan.TitlesAt(project, 200));            // after it ends
+        VideoSegment title = Assert.Single(PreviewPlan.BuildLayers(project)[1]); // on the V2 layer
+        Assert.Equal(MediaKind.Text, title.Kind);
+        Assert.False(title.CoversFrame(1920, 1080)); // see-through: what's below stays visible
+        Assert.Equal("Your title", title.Title!.Text);
     }
 
     [Fact]

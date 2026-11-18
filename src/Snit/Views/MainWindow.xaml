@@ -178,7 +178,7 @@
 
             <views:MediaBinView Grid.Column="0"/>
             <GridSplitter Grid.Column="1" ResizeDirection="Columns" Cursor="SizeWE"/>
-            <views:ProgramMonitorView Grid.Column="2"/>
+            <views:ProgramMonitorView x:Name="Monitor" Grid.Column="2"/>
             <GridSplitter Grid.Column="3" ResizeDirection="Columns" Cursor="SizeWE"/>
             <views:InspectorView Grid.Column="4"/>
         </Grid>

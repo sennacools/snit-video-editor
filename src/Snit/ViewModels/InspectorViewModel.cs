@@ -17,6 +17,7 @@ public partial class InspectorViewModel : ObservableObject
     public InspectorViewModel(TimelineViewModel timeline)
     {
         this.timeline = timeline;
+        Keys = new KeyframeMarks(this);
         timeline.PropertyChanged += OnTimelinePropertyChanged;
         timeline.ContentChanged += Refresh; // after undo/redo the values may be different
     }
@@ -24,10 +25,16 @@ public partial class InspectorViewModel : ObservableObject
     private void OnTimelinePropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (e.PropertyName is nameof(TimelineViewModel.SelectedClip) or "") Refresh();
+        // Animated values change as the playhead moves.
+        else if (e.PropertyName == nameof(TimelineViewModel.PlayheadFrame) && VisualClip is { Keyframes.Count: > 0 }) Refresh();
     }
 
     /// <summary>Re-read every value from the selected clip.</summary>
-    public void Refresh() => OnPropertyChanged(string.Empty);
+    public void Refresh()
+    {
+        OnPropertyChanged(string.Empty);
+        Keys?.Refresh();
+    }
 
     public string ClipName => timeline.SelectedClipName;
 
@@ -178,11 +185,101 @@ public partial class InspectorViewModel : ObservableObject
         if (VisualClip is Clip clip) Change(clip, property, c => c.Look = change(c.Look));
     }
 
-    public double Scale { get => Look.Scale; set => ChangeLook(nameof(Scale), l => l with { Scale = Math.Round(value) }); }
-    public double Rotation { get => Look.Rotation; set => ChangeLook(nameof(Rotation), l => l with { Rotation = Math.Round(value) }); }
-    public double Opacity { get => Look.Opacity; set => ChangeLook(nameof(Opacity), l => l with { Opacity = Math.Round(value) }); }
-    public double PositionX { get => Look.PositionX; set => ChangeLook(nameof(PositionX), l => l with { PositionX = Math.Round(value) }); }
-    public double PositionY { get => Look.PositionY; set => ChangeLook(nameof(PositionY), l => l with { PositionY = Math.Round(value) }); }
+    // The five transform settings can be animated with keyframes. They show their value at the
+    // playhead; when a setting is animated, changing it sets a keyframe at the playhead.
+    public double Scale { get => Animatable(nameof(Scale)); set => SetAnimatable(nameof(Scale), Math.Round(value)); }
+    public double Rotation { get => Animatable(nameof(Rotation)); set => SetAnimatable(nameof(Rotation), Math.Round(value)); }
+    public double Opacity { get => Animatable(nameof(Opacity)); set => SetAnimatable(nameof(Opacity), Math.Round(value)); }
+    public double PositionX { get => Animatable(nameof(PositionX)); set => SetAnimatable(nameof(PositionX), Math.Round(value)); }
+    public double PositionY { get => Animatable(nameof(PositionY)); set => SetAnimatable(nameof(PositionY), Math.Round(value)); }
+
+    // ===================== Keyframes =====================
+
+    /// <summary>Where the playhead is inside the selected clip (frames from its start).</summary>
+    private long PlayheadInClip => VisualClip is Clip c ? Math.Clamp(timeline.PlayheadFrame - c.Start, 0, Math.Max(0, c.Length - 1)) : 0;
+
+    private double Animatable(string name)
+    {
+        ClipLook now = VisualClip is Clip c ? Core.Keyframes.LookAt(c.Look, c.Keyframes, PlayheadInClip) : ClipLook.Default;
+        return name switch
+        {
+            nameof(Scale) => now.Scale,
+            nameof(Rotation) => now.Rotation,
+            nameof(Opacity) => now.Opacity,
+            nameof(PositionX) => now.PositionX,
+            _ => now.PositionY,
+        };
+    }
+
+    private static ClipLook WithValue(ClipLook look, string name, double value) => name switch
+    {
+        nameof(Scale) => look with { Scale = value },
+        nameof(Rotation) => look with { Rotation = value },
+        nameof(Opacity) => look with { Opacity = value },
+        nameof(PositionX) => look with { PositionX = value },
+        _ => look with { PositionY = value },
+    };
+
+    private void SetAnimatable(string name, double value)
+    {
+        if (VisualClip is not Clip clip) return;
+        long at = PlayheadInClip;
+        if (clip.Keyframes.ContainsKey(name))
+            Change(clip, name, c => c.Keyframes = Core.Keyframes.Set(c.Keyframes, name, at, value));
+        else
+            ChangeLook(name, l => WithValue(l, name, value));
+    }
+
+    /// <summary>The diamond buttons next to the transform sliders: Keys["Scale"] etc.</summary>
+    public KeyframeMarks Keys { get; }
+
+    /// <summary>
+    /// Diamond button: start animating (keyframe at the playhead), add a keyframe here, or remove
+    /// the keyframe that is here (removing the last one stops the animation at that value).
+    /// </summary>
+    [CommunityToolkit.Mvvm.Input.RelayCommand]
+    private void ToggleKeyframe(string name)
+    {
+        if (VisualClip is not Clip clip) return;
+        long at = PlayheadInClip;
+        double current = Animatable(name);
+        bool hereAlready = clip.Keyframes.TryGetValue(name, out var keys) && keys.Any(k => k.Frame == at);
+
+        Change(clip, "keyframe" + Guid.NewGuid(), c =>
+        {
+            if (!hereAlready)
+            {
+                c.Keyframes = Core.Keyframes.Set(c.Keyframes, name, at, current);
+                return;
+            }
+            c.Keyframes = Core.Keyframes.Remove(c.Keyframes, name, at);
+            if (!c.Keyframes.ContainsKey(name)) c.Look = WithValue(c.Look, name, current); // keep the value it had
+        });
+    }
+
+    /// <summary>The keyframe state of each setting, for the diamond buttons.</summary>
+    public sealed class KeyframeMarks : ObservableObject
+    {
+        private readonly InspectorViewModel owner;
+        public KeyframeMarks(InspectorViewModel owner) => this.owner = owner;
+
+        public KeyMark this[string name]
+        {
+            get
+            {
+                if (owner.VisualClip is not Clip clip || !clip.Keyframes.TryGetValue(name, out var keys))
+                    return new KeyMark("◇", false, "Animate: set a keyframe at the playhead");
+                bool here = keys.Any(k => k.Frame == owner.PlayheadInClip);
+                return here
+                    ? new KeyMark("◆", true, "Remove the keyframe at the playhead")
+                    : new KeyMark("◇", true, "Add a keyframe at the playhead");
+            }
+        }
+
+        public void Refresh() => OnPropertyChanged("Item[]");
+    }
+
+    public sealed record KeyMark(string Glyph, bool IsAnimated, string ToolTip);
 
     public double Exposure { get => Look.Exposure; set => ChangeLook(nameof(Exposure), l => l with { Exposure = Math.Round(value, 1) }); }
     public double Contrast { get => Look.Contrast; set => ChangeLook(nameof(Contrast), l => l with { Contrast = Math.Round(value) }); }
@@ -197,8 +294,12 @@ public partial class InspectorViewModel : ObservableObject
     [CommunityToolkit.Mvvm.Input.RelayCommand]
     private void ResetLook()
     {
-        if (VisualClip is Clip clip && clip.Look != ClipLook.Default)
-            Change(clip, nameof(ResetLook) + Guid.NewGuid(), c => c.Look = ClipLook.Default);
+        if (VisualClip is Clip clip && (clip.Look != ClipLook.Default || clip.Keyframes.Count > 0))
+            Change(clip, nameof(ResetLook) + Guid.NewGuid(), c =>
+            {
+                c.Look = ClipLook.Default;
+                c.Keyframes = Core.Keyframes.None;
+            });
     }
 
     // ===================== Transitions =====================

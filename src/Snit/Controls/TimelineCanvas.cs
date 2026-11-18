@@ -154,6 +154,24 @@ public class TimelineCanvas : FrameworkElement
 
         dc.Pop();
         dc.DrawRoundedRectangle(null, pen, Inflate(rect, selected ? -1 : -0.5), 5, 5);
+
+        // The selected clip shows its keyframes as small diamonds along its bottom edge.
+        if (selected && clip.Keyframes.Count > 0)
+        {
+            foreach (long frame in clip.Keyframes.Values.SelectMany(k => k).Select(k => k.Frame).Distinct())
+            {
+                double x = tl.FrameToX(clip.Start + frame), y = rect.Bottom - 6;
+                if (x < rect.Left - 1 || x > rect.Right + 1) continue;
+                var diamond = new StreamGeometry();
+                using (var g = diamond.Open())
+                {
+                    g.BeginFigure(new Point(x, y - 4), true, true);
+                    g.PolyLineTo([new Point(x + 4, y), new Point(x, y + 4), new Point(x - 4, y)], true, false);
+                }
+                diamond.Freeze();
+                dc.DrawGeometry(Brushes.White, new Pen(Res("AccentBrush"), 1), diamond);
+            }
+        }
     }
 
     /// <summary>

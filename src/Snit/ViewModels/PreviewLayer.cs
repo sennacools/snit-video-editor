@@ -32,7 +32,7 @@ public partial class PreviewLayer : ObservableObject
     public void Hide() => IsVisible = false;
 
     /// <summary>Shows decoded pixels (video or picture).</summary>
-    public void ShowPicture(DecodedFrame picture, VideoSegment segment, ProjectSettings frame, double visibility = 1, double brightness = 1)
+    public void ShowPicture(DecodedFrame picture, VideoSegment segment, ProjectSettings frame, double visibility = 1, double brightness = 1, ClipLook? look = null)
     {
         FramePool pool = picture.Pool;
         if (bitmap is null || bitmap.PixelWidth != pool.Width || bitmap.PixelHeight != pool.Height)
@@ -50,16 +50,16 @@ public partial class PreviewLayer : ObservableObject
             : 0;
         Width = fit > 0 ? segment.MediaWidth * fit : frame.Width;
         Height = fit > 0 ? segment.MediaHeight * fit : frame.Height;
-        ApplyLook(segment.Look, visibility, brightness);
+        ApplyLook(look ?? segment.Look, visibility, brightness);
     }
 
     /// <summary>Shows a title (a full-frame picture with see-through background).</summary>
-    public void ShowTitle(ImageSource picture, VideoSegment segment, ProjectSettings frame, double visibility = 1, double brightness = 1)
+    public void ShowTitle(ImageSource picture, VideoSegment segment, ProjectSettings frame, double visibility = 1, double brightness = 1, ClipLook? look = null)
     {
         Source = picture;
         Width = frame.Width;
         Height = frame.Height;
-        ApplyLook(segment.Look, visibility, brightness);
+        ApplyLook(look ?? segment.Look, visibility, brightness);
     }
 
     private void ApplyLook(ClipLook look, double visibility, double brightness)

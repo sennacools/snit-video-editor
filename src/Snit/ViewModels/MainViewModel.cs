@@ -121,9 +121,9 @@ public partial class MainViewModel : ObservableObject, IDisposable
             LayerFrame? layer = i < bundle.Length ? bundle[i] : null;
             if (layer is null) PreviewLayers[i].Hide();
             else if (layer.Segment.Title is TitleStyle title)
-                PreviewLayers[i].ShowTitle(TitlePicture(title), layer.Segment, project.Settings, layer.Visibility, layer.Brightness);
+                PreviewLayers[i].ShowTitle(TitlePicture(title), layer.Segment, project.Settings, layer.Visibility, layer.Brightness, layer.Look);
             else if (layer.Picture is DecodedFrame picture)
-                PreviewLayers[i].ShowPicture(picture, layer.Segment, project.Settings, layer.Visibility, layer.Brightness);
+                PreviewLayers[i].ShowPicture(picture, layer.Segment, project.Settings, layer.Visibility, layer.Brightness, layer.Look);
         }
         PlaybackEngine.Release(bundle);
     }

@@ -10,7 +10,8 @@ namespace Snit.Services;
 /// </summary>
 /// <param name="Visibility">0-1 from transitions (multiplied with the clip's opacity).</param>
 /// <param name="Brightness">0 = black, 1 = normal (dip to black).</param>
-public sealed record LayerFrame(VideoSegment Segment, DecodedFrame? Picture, double Visibility = 1, double Brightness = 1);
+/// <param name="Look">The clip's look at this frame (with animation applied).</param>
+public sealed record LayerFrame(VideoSegment Segment, DecodedFrame? Picture, double Visibility = 1, double Brightness = 1, ClipLook? Look = null);
 
 /// <summary>
 /// The preview player. It runs on its own thread, so decoding never freezes the window.
@@ -263,14 +264,14 @@ public sealed class PlaybackEngine : IDisposable
             for (int k = 0; k < here.Count; k++) active[t * LayersPerTrack + k] = here[k];
 
             VideoSegment? top = here.LastOrDefault();
-            bool covers = top is not null && top.CoversFrame(frameWidth, frameHeight)
+            bool covers = top is not null && top.CoversFrame(frameWidth, frameHeight, top.LookAt(frame))
                           && top.VisibilityAt(frame) >= 1 && top.BrightnessAt(frame) >= 1;
             if (covers) break;
         }
 
         // Skip the work if exactly the same thing is already on screen.
         string key = string.Join("|", active.Select(s => s is null ? "-"
-            : $"{s.ClipId}:{(s.Kind is MediaKind.Video ? s.SourceFrameAt(frame) : 0)}:{s.Look.GetHashCode()}:{s.Title?.Text}" +
+            : $"{s.ClipId}:{(s.Kind is MediaKind.Video ? s.SourceFrameAt(frame) : 0)}:{s.LookAt(frame).GetHashCode()}:{s.Title?.Text}" +
               $":{s.VisibilityAt(frame):0.###}:{s.BrightnessAt(frame):0.###}"));
         if (key == lastShownKey) return;
 
@@ -282,13 +283,13 @@ public sealed class PlaybackEngine : IDisposable
             double visibility = s.VisibilityAt(frame), brightness = s.BrightnessAt(frame);
             if (s.Kind == MediaKind.Text)
             {
-                bundle[i] = new LayerFrame(s, null, visibility, brightness); // the window draws titles
+                bundle[i] = new LayerFrame(s, null, visibility, brightness, s.LookAt(frame)); // the window draws titles
                 continue;
             }
             DecodedFrame? picture = null;
             try { picture = frames.GetFrame(s, s.SourceFrameAt(frame), DecoderSlot(i / LayersPerTrack, s)); }
             catch (Exception ex) { Debug.WriteLine($"Decoding failed: {ex.Message}"); }
-            if (picture is not null) bundle[i] = new LayerFrame(s, picture, visibility, brightness);
+            if (picture is not null) bundle[i] = new LayerFrame(s, picture, visibility, brightness, s.LookAt(frame));
         }
 
         lastShownKey = key;

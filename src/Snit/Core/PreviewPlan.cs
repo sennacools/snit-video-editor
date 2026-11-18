@@ -8,8 +8,12 @@ public sealed record VideoSegment(
     long Start, long End, string Path, MediaKind Kind,
     long In, long SourceLength, double Speed, bool Reverse,
     ClipLook Look, int MediaWidth, int MediaHeight, Guid ClipId, TitleStyle? Title,
-    long FadeInFrames = 0, long FadeOutFrames = 0, long BlackInFrames = 0, long BlackOutFrames = 0, int Slot = 0)
+    long FadeInFrames = 0, long FadeOutFrames = 0, long BlackInFrames = 0, long BlackOutFrames = 0, int Slot = 0,
+    IReadOnlyDictionary<string, IReadOnlyList<Keyframe>>? Keyframes = null)
 {
+    /// <summary>The look at a timeline frame, with animation applied.</summary>
+    public ClipLook LookAt(long frame) => Keyframes is null ? Look : Core.Keyframes.LookAt(Look, Keyframes, frame - Start);
+
     /// <summary>How visible (0–1) at a frame, for transitions (same ramps as <see cref="RenderClip"/>).</summary>
     public double VisibilityAt(long frame) => Ramp(frame, FadeInFrames, FadeOutFrames);
 
@@ -39,7 +43,9 @@ public sealed record VideoSegment(
     /// True when this clip hides everything below it: a normal video that fills the whole frame.
     /// Then the player doesn't need to decode the tracks underneath.
     /// </summary>
-    public bool CoversFrame(int frameWidth, int frameHeight)
+    public bool CoversFrame(int frameWidth, int frameHeight) => CoversFrame(frameWidth, frameHeight, Look);
+
+    public bool CoversFrame(int frameWidth, int frameHeight, ClipLook Look)
     {
         if (Kind != MediaKind.Video || MediaWidth <= 0 || MediaHeight <= 0) return false;
         if (Look.Scale < 100 || Look.Rotation != 0 || Look.Opacity < 100 || Look.PositionX != 0 || Look.PositionY != 0) return false;
@@ -75,7 +81,7 @@ public static class PreviewPlan
                     r.Clip.Start, r.Clip.End, r.Clip.Media.FilePath, r.Clip.Media.Kind,
                     r.Clip.In, r.Clip.SourceLength, r.Clip.Speed, r.Clip.Reverse,
                     r.Clip.Look, r.Clip.Media.Width, r.Clip.Media.Height, r.Original.Id, r.Clip.Title?.Copy(),
-                    r.FadeInFrames, r.FadeOutFrames, r.BlackInFrames, r.BlackOutFrames, r.Slot))
+                    r.FadeInFrames, r.FadeOutFrames, r.BlackInFrames, r.BlackOutFrames, r.Slot, r.Clip.Keyframes))
                 .ToList()))
             .ToList();
 

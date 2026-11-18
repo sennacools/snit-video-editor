@@ -114,6 +114,12 @@ public sealed class Clip
     /// <summary>Size, rotation, opacity, position and colour. Replaced as a whole (it never changes inside).</summary>
     public ClipLook Look { get; set; } = ClipLook.Default;
 
+    /// <summary>Animated transform settings (see <see cref="Core.Keyframes"/>). Replaced as a whole when changed.</summary>
+    public IReadOnlyDictionary<string, IReadOnlyList<Keyframe>> Keyframes { get; set; } = Core.Keyframes.None;
+
+    /// <summary>The look at a timeline frame, with animation applied.</summary>
+    public ClipLook LookAt(long timelineFrame) => Core.Keyframes.LookAt(Look, Keyframes, timelineFrame - Start);
+
     // ---- Transitions ----
 
     /// <summary>A transition at the start of the clip (from the clip before it, or a fade-in).</summary>

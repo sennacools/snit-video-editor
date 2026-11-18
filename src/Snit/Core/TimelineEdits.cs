@@ -30,6 +30,7 @@ public static class TimelineEdits
 
         clip.Start += startDelta;
         clip.Length += endDelta - startDelta;
+        clip.Keyframes = Keyframes.Shift(clip.Keyframes, -startDelta); // the animation stays with the picture
         clip.In = Math.Max(0, sourceStart);
     }
 

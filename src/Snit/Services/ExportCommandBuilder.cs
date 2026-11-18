@@ -95,24 +95,36 @@ public static class ExportCommandBuilder
             string speed = isStill ? "" : VideoFilters.VideoSpeed(clip.Speed, clip.Reverse);
             // 2. Fit inside the frame (keeping its shape), then colour, then size/rotation/opacity.
             //    Pictures and titles keep their see-through parts.
+            // Size, rotation, opacity and position: fixed, or changing every frame (keyframes).
+            string transform, x, y;
+            if (clip.Keyframes.Count > 0)
+            {
+                (transform, x, y) = VideoFilters.AnimatedTransform(clip, w, h, fit, projectFps, clip.Start / projectFps);
+                x = $"'{x}'";
+                y = $"'{y}'";
+            }
+            else
+            {
+                transform = VideoFilters.Transform(clip.Look, keepTransparency: isStill || fadesThrough);
+                x = $"(main_w-overlay_w)/2+({ProcessRunner.Num(Math.Round(clip.Look.PositionX * fit, 2))})";
+                y = $"(main_h-overlay_h)/2+({ProcessRunner.Num(Math.Round(clip.Look.PositionY * fit, 2))})";
+            }
+
             string label = $"v{input}";
             filters.Add(
                 $"[{input}:v:0]{speed.TrimStart(',')}{(speed.Length > 0 ? "," : "")}fps={fps},trim=duration={Sec(clip.Length)}," +
                 $"scale={w}:{h}:force_original_aspect_ratio=decrease,setsar=1" +
                 $"{VideoFilters.Color(clip.Look)}" +
                 $"{VideoFilters.Fade(rc.BlackInFrames, rc.BlackOutFrames, clip.Length, projectFps, alpha: false)}" +
-                $"{VideoFilters.Transform(clip.Look, keepTransparency: isStill || fadesThrough)}" +
+                $"{transform}" +
                 $"{VideoFilters.Fade(rc.FadeInFrames, rc.FadeOutFrames, clip.Length, projectFps, alpha: true)}," +
                 $"setpts=PTS-STARTPTS+{Sec(clip.Start)}/TB[{label}]");
 
             // 3. Lay it on top, centred and then moved by the clip's position (measured in the
             //    project frame, so scaled to the export size). eof_action=pass: once the clip
             //    ends, the picture underneath shows again.
-            string dx = ProcessRunner.Num(Math.Round(clip.Look.PositionX * fit, 2));
-            string dy = ProcessRunner.Num(Math.Round(clip.Look.PositionY * fit, 2));
             string next = $"o{input}";
-            filters.Add($"[{current}][{label}]overlay=x=(main_w-overlay_w)/2+({dx}):y=(main_h-overlay_h)/2+({dy})" +
-                        $":eof_action=pass:format=yuv420[{next}]");
+            filters.Add($"[{current}][{label}]overlay=x={x}:y={y}:eof_action=pass:format=yuv420[{next}]");
             current = next;
             input++;
         }

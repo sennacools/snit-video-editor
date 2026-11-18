@@ -7,9 +7,9 @@ It's built with C#, WPF and FFmpeg.
 
 ![Snit main window](docs/screenshot.png)
 
-> **Status:** work in progress. You can import media, edit on the timeline, preview with
-> sound, add titles, change size/position/colour/speed of clips, adjust volume and fades,
-> save projects and export to MP4. Transitions, keyframes and more formats are next.
+> **Status:** all six planned phases are in: editing, preview with sound, titles, picture
+> effects with keyframes, speed, transitions, and export to six formats. It is still young
+> software, so keep your original media files safe.
 
 ## What works
 
@@ -25,22 +25,34 @@ It's built with C#, WPF and FFmpeg.
 - **Picture**: scale, rotation, opacity and position (Transform), exposure, contrast,
   saturation and temperature (Colour) per clip in the inspector; the preview stacks the tracks
   so a smaller or see-through clip on V2 shows V1 underneath
+- **Keyframes**: animate scale, rotation, opacity and position with the diamond next to each
+  slider; values change evenly between keyframes
 - **Speed** from 10% to 400% and **reverse**, for video and its sound together
+- **Transitions**: cross-dissolve and dip to black (from the Transitions tab, or Ctrl+D at a cut);
+  the clip's sound cross-fades along. A dissolve uses footage just beyond the cut if the files have it
+- **In and out marks** (I and O) to export just a part of the timeline
 - **Undo / redo** for every timeline edit (one slider drag or one bit of typing is one step)
 - **Projects** saved as `.snit` files (plain JSON; media files are referenced, never copied)
-- **Export** to MP4 (H.264 video, AAC 320 kbps sound) at 720p, 1080p, 4K or vertical 1080×1920,
-  24–60 fps, with a quality slider, a progress bar with time left, and a Stop button.
-  Uses your NVIDIA, Intel or AMD graphics card when it can (needs an up-to-date driver).
+- **Export** to MP4 (H.264 or H.265), WebM (VP9), MOV (ProRes 422 HQ), GIF or MP3 at 720p,
+  1080p, 4K or vertical 1080×1920, 24–60 fps, the whole timeline or just in-to-out, with a
+  quality slider, a progress bar with time left, and a Stop button. H.264/H.265 can use your
+  NVIDIA, Intel or AMD graphics card (needs an up-to-date driver).
 
 ## Keyboard shortcuts
 
 | Key | Action |
 | --- | --- |
 | Space | Play / pause |
+| J / K / L | Play backwards / stop / play forwards (press again to go faster) |
 | ← / → | Previous / next frame |
+| ↑ / ↓ | Previous / next cut |
 | Home / End | Go to start / end |
+| I / O | Mark in / mark out (Ctrl+Shift+X clears both) |
+| V / C / B / T / H / Z | Select / razor / ripple trim / text / hand / zoom tool |
+| S | Snapping on / off |
 | Delete | Delete selected clips (Shift+Delete: ripple delete) |
 | Ctrl+K | Cut clips at the playhead |
+| Ctrl+D | Cross dissolve at the cut nearest the playhead |
 | Ctrl+Z / Ctrl+Shift+Z | Undo / redo |
 | = / - | Zoom timeline in / out (Ctrl+mouse wheel also zooms) |
 | Ctrl+N / Ctrl+O / Ctrl+S | New / open / save project |

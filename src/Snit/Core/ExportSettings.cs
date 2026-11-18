@@ -14,6 +14,10 @@ public sealed class ExportSettings
     public double VideoBitrateMbps { get; init; } = 16;
     public int AudioBitrateKbps { get; init; } = 320;
 
+    /// <summary>Export only this part of the timeline (frames, end not included). Null = the whole timeline.</summary>
+    public long? RangeStart { get; init; }
+    public long? RangeEnd { get; init; }
+
     /// <summary>The FFmpeg video encoder, e.g. "libx264" (computer's processor) or "h264_nvenc" (NVIDIA graphics card).</summary>
     public string VideoEncoder { get; init; } = "libx264";
 }

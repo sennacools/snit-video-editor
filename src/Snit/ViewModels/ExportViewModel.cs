@@ -83,9 +83,16 @@ public partial class ExportViewModel : ObservableObject
     [ObservableProperty, NotifyPropertyChangedFor(nameof(BitrateMbps), nameof(BitrateText), nameof(VideoSummary), nameof(EstimatedSize))]
     private Choice<double> selectedFrameRate;
 
-    /// <summary>True = whole sequence. "In to out" needs in/out points, which don't exist yet.</summary>
-    [ObservableProperty]
+    /// <summary>True = the whole timeline; false = only between the in and out marks.</summary>
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(DurationText), nameof(EstimatedSize))]
     private bool wholeSequence = true;
+
+    /// <summary>"In to out" can only be picked when both marks are set (I and O keys).</summary>
+    public bool CanUseRange => project.InPoint is long i && project.OutPoint is long o && o > i;
+
+    public string RangeToolTip => CanUseRange
+        ? "Export only the part between the in and out marks"
+        : "Set an in mark (I) and an out mark (O) on the timeline first";
 
     /// <summary>The quality slider, 0–100.</summary>
     [ObservableProperty, NotifyPropertyChangedFor(nameof(BitrateMbps), nameof(BitrateText), nameof(VideoSummary), nameof(EstimatedSize))]
@@ -119,9 +126,13 @@ public partial class ExportViewModel : ObservableObject
 
     // ===================== Summary =====================
 
-    private double DurationSeconds => project.DurationFrames / project.Fps;
+    private long ExportFrames => WholeSequence || !CanUseRange
+        ? project.DurationFrames
+        : Math.Min(project.OutPoint!.Value, project.DurationFrames) - project.InPoint!.Value;
 
-    public string DurationText => Timecode.FromFrames(project.DurationFrames, project.Fps);
+    private double DurationSeconds => ExportFrames / project.Fps;
+
+    public string DurationText => Timecode.FromFrames(ExportFrames, project.Fps);
 
     public string VideoSummary => $"H.264 · {BitrateText}{(UseGpu && IsGpuAvailable ? " · graphics card" : "")}";
 
@@ -216,6 +227,8 @@ public partial class ExportViewModel : ObservableObject
             FrameRate = SelectedFrameRate.Value,
             VideoBitrateMbps = BitrateMbps,
             VideoEncoder = UseGpu && gpuEncoder is not null ? gpuEncoder : "libx264",
+            RangeStart = WholeSequence || !CanUseRange ? null : project.InPoint,
+            RangeEnd = WholeSequence || !CanUseRange ? null : project.OutPoint,
         };
 
         ExportPlan plan;

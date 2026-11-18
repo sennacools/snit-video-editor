@@ -32,9 +32,18 @@ public static class ExportCommandBuilder
             throw new NotSupportedException("Only MP4 (H.264) export is available so far.");
 
         double projectFps = project.Fps;
-        double duration = project.DurationFrames / projectFps;
-        if (duration <= 0)
+        if (project.DurationFrames <= 0)
             throw new InvalidOperationException("The timeline is empty.");
+
+        // The part to export: the whole timeline, or the in/out range.
+        long rangeStart = Math.Max(0, settings.RangeStart ?? 0);
+        long rangeEnd = Math.Min(project.DurationFrames, settings.RangeEnd ?? project.DurationFrames);
+        if (rangeEnd <= rangeStart)
+            throw new InvalidOperationException("The in/out range is empty.");
+        bool isRange = rangeStart > 0 || rangeEnd < project.DurationFrames;
+        double timelineEnd = rangeEnd / projectFps;               // everything is built up to here...
+        double duration = (rangeEnd - rangeStart) / projectFps;  // ...and this much is kept
+        bool InRange(Clip c) => c.End > rangeStart && c.Start < rangeEnd;
 
         var missing = project.AllClips.Where(c => c.Media.IsOffline).Select(c => c.Media.Name).Distinct().ToList();
         if (missing.Count > 0)
@@ -55,12 +64,12 @@ public static class ExportCommandBuilder
         int titleW = (int)Math.Round(project.Settings.Width * fit), titleH = (int)Math.Round(project.Settings.Height * fit);
 
         // ---- Video ----
-        filters.Add($"color=c=black:s={w}x{h}:r={fps}:d={ProcessRunner.Num(duration)}[base]");
+        filters.Add($"color=c=black:s={w}x{h}:r={fps}:d={ProcessRunner.Num(timelineEnd)}[base]");
         string current = "base";
 
         // Bottom track first, so higher tracks end up on top.
         var videoTracks = project.Tracks.Where(t => t.Kind == TrackKind.Video && !t.IsOff).Reverse();
-        foreach (Clip clip in videoTracks.SelectMany(t => t.Clips.OrderBy(c => c.Start)))
+        foreach (Clip clip in videoTracks.SelectMany(t => t.Clips.Where(InRange).OrderBy(c => c.Start)))
         {
             bool isStill = clip.Media.Kind is MediaKind.Image or MediaKind.Text;
             if (clip.Title is TitleStyle title)
@@ -99,11 +108,13 @@ public static class ExportCommandBuilder
             current = next;
             input++;
         }
-        filters.Add($"[{current}]format=yuv420p[vout]");
+        // Keep only the chosen range (and start its timestamps at zero).
+        string keepRange = isRange ? $"trim=start={Sec(rangeStart)}:end={Sec(rangeEnd)},setpts=PTS-STARTPTS," : "";
+        filters.Add($"[{current}]{keepRange}format=yuv420p[vout]");
 
         // ---- Audio ----
         var audioClips = project.Tracks.Where(t => t.Kind == TrackKind.Audio && !t.IsOff)
-            .SelectMany(t => t.Clips.OrderBy(c => c.Start)).ToList();
+            .SelectMany(t => t.Clips.Where(InRange).OrderBy(c => c.Start)).ToList();
         var audioLabels = new List<string>();
         foreach (Clip clip in audioClips)
         {
@@ -119,7 +130,8 @@ public static class ExportCommandBuilder
             input++;
         }
 
-        string exactLength = $"apad,atrim=0:{ProcessRunner.Num(duration)}";
+        string exactLength = $"apad,atrim=0:{ProcessRunner.Num(timelineEnd)}" +
+                             (isRange ? $",atrim=start={Sec(rangeStart)},asetpts=PTS-STARTPTS" : "");
         if (audioLabels.Count == 0)
             filters.Add($"anullsrc=r={SampleRate}:cl=stereo,atrim=0:{ProcessRunner.Num(duration)}[aout]");
         else

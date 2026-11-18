@@ -131,10 +131,10 @@
                                 <UniformGrid Columns="2">
                                     <RadioButton Style="{StaticResource SegmentButton}" Content="Whole sequence" Padding="4,3"
                                                  FontSize="11" IsChecked="{Binding WholeSequence}"/>
-                                    <RadioButton Style="{StaticResource SegmentButton}" Content="In to out" IsEnabled="False"
-                                                 Padding="4,3" FontSize="11"
-                                                 ToolTipService.ShowOnDisabled="True" ToolTip="In and out points come in a later phase"
-                                                 Opacity="0.45"/>
+                                    <RadioButton Style="{StaticResource SegmentButton}" Content="In to out"
+                                                 Padding="4,3" FontSize="11" IsEnabled="{Binding CanUseRange}"
+                                                 IsChecked="{Binding WholeSequence, Converter={StaticResource EqualsConverter}, ConverterParameter=False}"
+                                                 ToolTipService.ShowOnDisabled="True" ToolTip="{Binding RangeToolTip}"/>
                                 </UniformGrid>
                             </Border>
                         </StackPanel>

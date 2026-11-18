@@ -123,6 +123,29 @@ public class LookExportTests(TestMedia media) : IClassFixture<TestMedia>
     }
 
     [Fact]
+    public async Task In_to_out_exports_only_that_part()
+    {
+        if (!media.Available) return;
+        var (project, _, _) = await ProjectWith(media.Video30); // 4 s with sound
+        var output = Path.Combine(media.Folder, "range.mp4");
+        var plan = ExportCommandBuilder.Build(project, new ExportSettings
+        {
+            OutputPath = output, Width = W, Height = H, RangeStart = 30, RangeEnd = 75, // 1 s to 2.5 s
+        });
+        Assert.Equal(45, plan.TotalFrames);
+        await new Exporter().RunAsync(plan, null, CancellationToken.None);
+
+        MediaItem result = await MediaImporter.ProbeAsync(output);
+        Assert.InRange(result.DurationSeconds, 1.45, 1.6);
+        Assert.True(result.HasAudio);
+
+        // The first exported frame is the frame at 1 s of the normal export.
+        byte[] first = await FrameAsync(output, 0);
+        byte[] atOneSecond = await FrameAsync(await ExportAsync(project, "whole"), 30);
+        Assert.True(first.Zip(atOneSecond, (a, b) => Math.Abs(a - b)).Average() < 6);
+    }
+
+    [Fact]
     public void Speed_filters_use_atempo_in_steps()
     {
         Assert.Equal(",atempo=2,atempo=2", VideoFilters.AudioSpeed(4, false));

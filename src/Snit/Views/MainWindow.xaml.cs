@@ -220,4 +220,10 @@ public partial class MainWindow : Window
         MaximizeButton.Content = maximized ? "" : "";
         MaximizeButton.ToolTip = maximized ? "Restore" : "Maximise";
     }
+
+    private void SequenceSettings_Click(object sender, RoutedEventArgs e)
+    {
+        if (SequenceSettingsWindow.Ask(this, viewModel.SequenceWidth, viewModel.SequenceHeight, viewModel.SequenceFps) is { } chosen)
+            viewModel.ApplySequenceSettings(chosen.Width, chosen.Height, chosen.Fps);
+    }
 }

@@ -433,7 +433,24 @@ public partial class MainViewModel : ObservableObject, IDisposable
         };
     }
 
-    private void SwitchTo(Project newProject)
+    public int SequenceWidth => project.Settings.Width;
+    public int SequenceHeight => project.Settings.Height;
+    public double SequenceFps => project.Settings.FrameRate;
+
+    /// <summary>Timeline → Sequence settings: a new size and frame rate (clips are converted).</summary>
+    public void ApplySequenceSettings(int width, int height, double fps)
+    {
+        if (width == project.Settings.Width && height == project.Settings.Height && Math.Abs(fps - project.Settings.FrameRate) < 1e-9)
+            return;
+        if (IsPlaying) PlayPause();
+        long playhead = Timeline.PlayheadFrame;
+        double oldFps = project.Settings.FrameRate;
+        SequenceSettings.Apply(project, width, height, fps);
+        SwitchTo(project, dirty: true);
+        Timeline.PlayheadFrame = (long)Math.Round(playhead * fps / oldFps);
+    }
+
+    private void SwitchTo(Project newProject, bool dirty = false)
     {
         if (IsPlaying) PlayPause();
         project = newProject;
@@ -444,7 +461,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
         playback.Dispose();
         playback = CreatePlayer(project);
 
-        IsDirty = false;
+        IsDirty = dirty;
         ExportCommand.NotifyCanExecuteChanged();
         titlePictures.Clear();
         OnPropertyChanged(nameof(FrameWidth));

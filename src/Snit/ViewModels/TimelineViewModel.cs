@@ -98,7 +98,7 @@ public partial class TimelineViewModel : ObservableObject
     {
         if (track is null) return;
         int sameKind = track.Kind == TrackKind.Video ? Project.VideoTrackCount : Project.AudioTrackCount;
-        if (sameKind <= 1) return; // always keep one video and one sound track
+        if (track.Kind != TrackKind.Caption && sameKind <= 1) return; // always keep one video and one sound track
         SaveUndoPoint();
         Selection.RemoveWhere(track.Clips.Contains);
         track.PropertyChanged -= OnTrackChanged;
@@ -563,6 +563,44 @@ public partial class TimelineViewModel : ObservableObject
     /// <summary>Adds a new title (5 seconds, on V2) at the playhead.</summary>
     [RelayCommand]
     private void AddTitleAtPlayhead() => AddMedia(MediaItem.Title, Project.TitleTrack, PlayheadFrame);
+
+    // ===================== Captions =====================
+
+    /// <summary>Adds a 3-second caption at the playhead on the C1 track (made when needed), selected for typing.</summary>
+    [RelayCommand]
+    private void AddCaptionAtPlayhead()
+    {
+        SaveUndoPoint();
+        Track track = Captions.EnsureTrack(Project);
+        if (track.IsLocked) return;
+        long length = (long)Math.Round(3 * Fps);
+        Clip clip = Captions.MakeClip(PlayheadFrame, length, "New caption");
+        TimelineEdits.ClearRange(track, clip.Start, clip.End, []);
+        track.Clips.Add(clip);
+        Select(clip, add: false);
+        NotifyContentChanged();
+    }
+
+    /// <summary>Reads an .srt file onto the captions track. Returns how many captions it had.</summary>
+    public int ImportCaptions(string path)
+    {
+        var lines = Srt.Parse(System.IO.File.ReadAllText(path));
+        if (lines.Count == 0) return 0;
+        SaveUndoPoint();
+        int count = Captions.Import(Project, lines);
+        NotifyContentChanged();
+        return count;
+    }
+
+    /// <summary>Writes the captions as an .srt file. Returns how many there were.</summary>
+    public int ExportCaptions(string path)
+    {
+        var lines = Captions.Lines(Project);
+        System.IO.File.WriteAllText(path, Srt.Write(lines));
+        return lines.Count;
+    }
+
+    public bool HasCaptions => Project.CaptionTrack is { Clips.Count: > 0 };
 
     /// <summary>
     /// The look the next new title gets (set while a title template is dragged from the Text tab);

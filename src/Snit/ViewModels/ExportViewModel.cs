@@ -81,6 +81,17 @@ public partial class ExportViewModel : ObservableObject
     /// <summary>MP3 has no picture: resolution and frame rate don't matter then.</summary>
     public bool HasPicture => SelectedFormat.Value != ExportFormat.Mp3;
 
+    /// <summary>Whether the project has captions (then the caption options show).</summary>
+    public bool HasCaptions => project.CaptionTrack is { Clips.Count: > 0 };
+
+    /// <summary>Draw the captions into the picture.</summary>
+    [ObservableProperty]
+    private bool burnInCaptions = true;
+
+    /// <summary>Also save the captions as an .srt file next to the video.</summary>
+    [ObservableProperty]
+    private bool saveCaptionFile;
+
     /// <summary>The quality slider only works for H.264, H.265 and VP9 (ProRes, GIF and MP3 have fixed quality).</summary>
     public bool HasQuality => SelectedFormat.Value is ExportFormat.Mp4H264 or ExportFormat.Mp4H265 or ExportFormat.WebmVp9;
 
@@ -269,6 +280,8 @@ public partial class ExportViewModel : ObservableObject
             VideoEncoder = GpuInUse && gpuEncoder is not null ? gpuEncoder : "libx264",
             RangeStart = WholeSequence || !CanUseRange ? null : project.InPoint,
             RangeEnd = WholeSequence || !CanUseRange ? null : project.OutPoint,
+            BurnInCaptions = BurnInCaptions,
+            SaveCaptionFile = HasCaptions && SaveCaptionFile,
         };
 
         ExportPlan plan;
@@ -295,6 +308,13 @@ public partial class ExportViewModel : ObservableObject
         {
             await new Exporter().RunAsync(plan, progress, cancel.Token);
             exportedPath = output;
+            if (settings.SaveCaptionFile)
+            {
+                // Times count from the start of the exported part.
+                long from = settings.RangeStart ?? 0;
+                File.WriteAllText(Path.ChangeExtension(output, ".srt"),
+                    Srt.Write(Captions.Lines(project, from, settings.RangeEnd)));
+            }
             IsDone = true;
             ProgressValue = 1;
             TimeLeftText = "";

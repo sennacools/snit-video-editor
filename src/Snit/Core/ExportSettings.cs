@@ -6,6 +6,12 @@ public enum ExportFormat { Mp4H264, Mp4H265, WebmVp9, MovProRes, Gif, Mp3 }
 /// <summary>Everything chosen in the export dialog.</summary>
 public sealed class ExportSettings
 {
+    /// <summary>Draw the captions (C1 track) into the picture.</summary>
+    public bool BurnInCaptions { get; set; } = true;
+
+    /// <summary>Also write the captions as an .srt file next to the video.</summary>
+    public bool SaveCaptionFile { get; set; }
+
     public required string OutputPath { get; init; }
     public ExportFormat Format { get; init; } = ExportFormat.Mp4H264;
     public int Width { get; init; } = 1920;

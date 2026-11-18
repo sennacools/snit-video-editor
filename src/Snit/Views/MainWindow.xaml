@@ -109,6 +109,10 @@
                         <Separator/>
                         <MenuItem Header="Sequence settings…" Click="SequenceSettings_Click"/>
                         <Separator/>
+                        <MenuItem Header="Add caption at playhead" Command="{Binding Timeline.AddCaptionAtPlayheadCommand}"/>
+                        <MenuItem Header="Import captions (.srt)…" Click="ImportCaptions_Click"/>
+                        <MenuItem Header="Export captions (.srt)…" Click="ExportCaptions_Click"/>
+                        <Separator/>
                         <MenuItem Header="Add video track" Command="{Binding Timeline.AddVideoTrackCommand}"/>
                         <MenuItem Header="Add audio track" Command="{Binding Timeline.AddAudioTrackCommand}"/>
                         <Separator/>

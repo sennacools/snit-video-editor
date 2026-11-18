@@ -43,6 +43,10 @@
                 </DockPanel>
             </Border>
             <DataTemplate.Triggers>
+                <DataTrigger Binding="{Binding Kind}" Value="{x:Static core:TrackKind.Caption}">
+                    <Setter TargetName="OffToggle" Property="ToolTip" Value="Hide captions"/>
+                    <Setter TargetName="Row" Property="ToolTip" Value="Captions: each clip is one subtitle. Select one and type its text in the inspector."/>
+                </DataTrigger>
                 <DataTrigger Binding="{Binding Kind}" Value="{x:Static core:TrackKind.Audio}">
                     <Setter TargetName="OffToggle" Property="Content" Value="&#xE767;"/>
                     <Setter TargetName="OffToggle" Property="ToolTip" Value="Mute track"/>

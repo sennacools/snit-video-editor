@@ -226,4 +226,37 @@ public partial class MainWindow : Window
         if (SequenceSettingsWindow.Ask(this, viewModel.SequenceWidth, viewModel.SequenceHeight, viewModel.SequenceFps) is { } chosen)
             viewModel.ApplySequenceSettings(chosen.Width, chosen.Height, chosen.Fps);
     }
+
+    private void ImportCaptions_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new Microsoft.Win32.OpenFileDialog { Title = "Import captions", Filter = "Subtitles (*.srt)|*.srt|All files|*.*" };
+        if (dialog.ShowDialog(this) != true) return;
+        try
+        {
+            int count = viewModel.Timeline.ImportCaptions(dialog.FileName);
+            if (count == 0)
+                MessageBox.Show(this, "No captions were found in that file.", "Import captions", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            MessageBox.Show(this, "Couldn't read the file: " + ex.Message, "Import captions", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
+    private void ExportCaptions_Click(object sender, RoutedEventArgs e)
+    {
+        if (!viewModel.Timeline.HasCaptions)
+        {
+            MessageBox.Show(this, "There are no captions yet. Add some with Timeline → Add caption at playhead, or import an .srt file.",
+                "Export captions", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+        var dialog = new Microsoft.Win32.SaveFileDialog { Title = "Export captions", Filter = "Subtitles (*.srt)|*.srt", FileName = "captions.srt" };
+        if (dialog.ShowDialog(this) != true) return;
+        try { viewModel.Timeline.ExportCaptions(dialog.FileName); }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            MessageBox.Show(this, "Couldn't save the file: " + ex.Message, "Export captions", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
 }

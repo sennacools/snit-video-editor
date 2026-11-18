@@ -12,7 +12,8 @@ namespace Snit.Core;
 /// <summary>Text = a title made in Snit (no file).</summary>
 public enum MediaKind { Video, Audio, Image, Text }
 
-public enum TrackKind { Video, Audio }
+/// <summary>Video tracks (V1…), sound tracks (A1…) and the captions track (C1, subtitles, always on top).</summary>
+public enum TrackKind { Video, Audio, Caption }
 
 public sealed class ProjectSettings
 {
@@ -367,9 +368,13 @@ public sealed class Project
         return audio;
     }
 
+    /// <summary>The captions track (C1), or null when the project has no captions.</summary>
+    public Track? CaptionTrack => Tracks.FirstOrDefault(t => t.Kind == TrackKind.Caption);
+
     /// <summary>Removes a track (there is always at least one video and one sound track) and renumbers the rest.</summary>
     public bool RemoveTrack(Track track)
     {
+        if (track.Kind == TrackKind.Caption) return Tracks.Remove(track);
         int sameKind = track.Kind == TrackKind.Video ? VideoTrackCount : AudioTrackCount;
         if (sameKind <= 1 || !Tracks.Remove(track)) return false;
         RenumberTracks();

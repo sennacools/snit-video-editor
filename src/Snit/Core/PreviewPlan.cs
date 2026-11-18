@@ -77,7 +77,7 @@ public static class PreviewPlan
     /// empty list, so the numbering of the layers never changes.
     /// </summary>
     public static IReadOnlyList<IReadOnlyList<VideoSegment>> BuildLayers(Project project)
-        => project.Tracks.Where(t => t.Kind == TrackKind.Video).Reverse()
+        => project.Tracks.Where(t => t.Kind != TrackKind.Audio).Reverse()
             .Select(t => (IReadOnlyList<VideoSegment>)(t.IsOff ? [] : TransitionPlan.Expand(t, project.Fps)
                 .Where(r => !r.Clip.Media.IsOffline)
                 .Select(r => new VideoSegment(

@@ -69,7 +69,9 @@ public static class ExportCommandBuilder
         string current = "base";
 
         // Bottom track first, so higher tracks end up on top.
-        var videoTracks = project.Tracks.Where(t => t.Kind == TrackKind.Video && !t.IsOff).Reverse();
+        var videoTracks = project.Tracks
+            .Where(t => !t.IsOff && (t.Kind == TrackKind.Video || (t.Kind == TrackKind.Caption && settings.BurnInCaptions)))
+            .Reverse();
         // Clips as they really appear once transitions are applied (maybe a bit longer, with fades).
         var videoClips = videoTracks.SelectMany(t => TransitionPlan.Expand(t, projectFps)).Where(r => InRange(r.Clip));
         foreach (RenderClip rc in wantVideo ? videoClips : [])

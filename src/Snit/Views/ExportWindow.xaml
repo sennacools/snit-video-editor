@@ -140,6 +140,14 @@
                         </StackPanel>
                     </Grid>
 
+                    <StackPanel Orientation="Horizontal" Margin="0,10,0,0"
+                                Visibility="{Binding HasCaptions, Converter={StaticResource BoolToVisibility}}">
+                        <CheckBox Content="Captions in the picture" IsChecked="{Binding BurnInCaptions}" IsEnabled="{Binding HasPicture}"
+                                  ToolTip="Draw the subtitles from the C1 track into the video"/>
+                        <CheckBox Content="Also save an .srt file" Margin="16,0,0,0" IsChecked="{Binding SaveCaptionFile}"
+                                  ToolTip="Subtitles as a separate file next to the video (for YouTube and players)"/>
+                    </StackPanel>
+
                     <TextBlock Text="Quality" Style="{StaticResource FieldLabel}"/>
                     <DockPanel>
                         <TextBlock DockPanel.Dock="Right" Text="{Binding BitrateText}" Style="{StaticResource TimecodeText}"

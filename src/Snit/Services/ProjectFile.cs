@@ -157,8 +157,10 @@ public static class ProjectFile
 
         foreach (var t in data.Tracks)
         {
-            if (t.Name.Length < 2 || (t.Name[0] != 'V' && t.Name[0] != 'A')) continue;
-            Track track = project.EnsureTrack(t.Name); // adds V3, A3… when the project has them
+            if (t.Name.Length < 2 || (t.Name[0] != 'V' && t.Name[0] != 'A' && t.Name[0] != 'C')) continue;
+            Track track = t.Name[0] == 'C'
+                ? Captions.EnsureTrack(project)
+                : project.EnsureTrack(t.Name); // adds V3, A3… when the project has them
             track.IsOff = t.IsOff;
             track.IsLocked = t.IsLocked;
             track.VolumeDb = t.VolumeDb;

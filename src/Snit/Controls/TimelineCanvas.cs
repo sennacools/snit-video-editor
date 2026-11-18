@@ -123,6 +123,9 @@ public class TimelineCanvas : FrameworkElement
         DrawTransitionGhost(dc, tl);
         DrawRazorLine(dc, tl);
 
+        if (box is Rect selectionBox)
+            dc.DrawRectangle(Res("AccentTintBrush"), new Pen(Res("AccentBrush"), 1), selectionBox);
+
         if (tl.SnapLineFrame is long snap)
             DrawVerticalLine(dc, tl.FrameToX(snap), Res("AccentBrush"), 1);
 
@@ -378,7 +381,11 @@ public class TimelineCanvas : FrameworkElement
 
     // ===================== Mouse =====================
 
-    private enum DragMode { None, Move, TrimLeft, TrimRight, Pan }
+    private enum DragMode { None, Move, TrimLeft, TrimRight, Pan, Box }
+
+    // Box-select: the clips that were selected before the box (kept when Ctrl is held) and the box itself.
+    private List<Clip> boxKeep = [];
+    private Rect? box;
 
     private DragMode mode = DragMode.None;
     private bool dragStarted;
@@ -434,7 +441,12 @@ public class TimelineCanvas : FrameworkElement
             default: // Select and Ripple
                 if (!clipUsable)
                 {
-                    tl.ClearSelection();
+                    // Empty space: start a selection box (Ctrl/Shift keeps what was already selected).
+                    bool keep = Keyboard.Modifiers.HasFlag(ModifierKeys.Control) || Keyboard.Modifiers.HasFlag(ModifierKeys.Shift);
+                    boxKeep = keep ? tl.Selection.ToList() : [];
+                    if (!keep) tl.ClearSelection();
+                    mode = DragMode.Box;
+                    CaptureMouse();
                     return;
                 }
                 bool add = Keyboard.Modifiers.HasFlag(ModifierKeys.Control) || Keyboard.Modifiers.HasFlag(ModifierKeys.Shift);
@@ -482,6 +494,19 @@ public class TimelineCanvas : FrameworkElement
         switch (mode)
         {
             case DragMode.Pan: tl.ScrollX = Math.Clamp(panStartScroll - (p.X - dragStartPoint.X), 0, tl.ScrollMaximum); break;
+            case DragMode.Box:
+                var r = new Rect(dragStartPoint, p);
+                box = r;
+                // Every clip the box touches.
+                var touched = new List<Clip>();
+                for (int i = 0; i < tl.Tracks.Count; i++)
+                {
+                    double top = i * TrackHeight + ClipInset, bottom = (i + 1) * TrackHeight - ClipInset;
+                    if (bottom < r.Top || top > r.Bottom) continue;
+                    touched.AddRange(tl.Tracks[i].Clips.Where(c => tl.FrameToX(c.End) >= r.Left && tl.FrameToX(c.Start) <= r.Right));
+                }
+                tl.SelectClips(touched, boxKeep);
+                break;
             case DragMode.Move: tl.UpdateMove(tl.FrameAt(p.X), TrackAt(p.Y)); break;
             case DragMode.TrimLeft:
             case DragMode.TrimRight: tl.UpdateTrim(tl.FrameAt(p.X)); break;
@@ -513,6 +538,11 @@ public class TimelineCanvas : FrameworkElement
 
         if (finished == DragMode.Move) tl.EndMove();
         else if (finished is DragMode.TrimLeft or DragMode.TrimRight) tl.EndTrim();
+        else if (finished == DragMode.Box)
+        {
+            box = null;
+            InvalidateVisual();
+        }
     }
 
     protected override void OnMouseLeave(MouseEventArgs e)

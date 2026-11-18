@@ -397,6 +397,8 @@ public partial class TimelineViewModel : ObservableObject
         RedoCommand.NotifyCanExecuteChanged();
         DeleteSelectionCommand.NotifyCanExecuteChanged();
         RippleDeleteSelectionCommand.NotifyCanExecuteChanged();
+        CopyCommand.NotifyCanExecuteChanged();
+        CutCommand.NotifyCanExecuteChanged();
     }
 
     public void NotifyContentChanged()
@@ -476,6 +478,77 @@ public partial class TimelineViewModel : ObservableObject
         Selection.RemoveWhere(c => c.Media == media);
         SelectionChanged();
         NotifyContentChanged();
+    }
+
+    // ===================== Copy, cut and paste =====================
+
+    /// <summary>Copied clips, with the name of the track each came from.</summary>
+    private List<(string TrackName, Clip Clip)> clipboard = [];
+
+    public bool HasClipboard => clipboard.Count > 0;
+
+    [RelayCommand(CanExecute = nameof(HasSelection))]
+    private void Copy()
+    {
+        clipboard = Selection.Select(c => (Project.TrackOf(c).Name, c.Copy())).ToList();
+        PasteCommand.NotifyCanExecuteChanged();
+    }
+
+    [RelayCommand(CanExecute = nameof(HasSelection))]
+    private void Cut()
+    {
+        Copy();
+        DeleteSelection();
+    }
+
+    /// <summary>
+    /// Puts the copied clips at the playhead, on the tracks they came from (or the first track of
+    /// the right kind if that track is gone), keeping their spacing. Anything there is overwritten.
+    /// </summary>
+    [RelayCommand(CanExecute = nameof(HasClipboard))]
+    private void Paste()
+    {
+        if (clipboard.Count == 0) return;
+        SaveUndoPoint();
+        long offset = PlayheadFrame - clipboard.Min(c => c.Clip.Start);
+        var newLinks = new Dictionary<Guid, Guid>();
+        var pasted = new List<Clip>();
+
+        foreach (var (trackName, original) in clipboard)
+        {
+            Clip clip = original.Copy();
+            clip.Id = Guid.NewGuid();
+            clip.Start += offset;
+            if (clip.LinkId is Guid old) // pasted pairs stay pairs, but separate from the originals
+            {
+                if (!newLinks.TryGetValue(old, out Guid fresh)) newLinks[old] = fresh = Guid.NewGuid();
+                clip.LinkId = fresh;
+            }
+
+            TrackKind kind = trackName.StartsWith('A') ? TrackKind.Audio : TrackKind.Video;
+            Track track = Project.Tracks.FirstOrDefault(t => t.Name == trackName)
+                          ?? (kind == TrackKind.Audio ? Project.FirstAudioTrack : Project.FirstVideoTrack);
+            if (track.IsLocked) continue;
+            TimelineEdits.ClearRange(track, clip.Start, clip.End, pasted);
+            track.Clips.Add(clip);
+            pasted.Add(clip);
+        }
+
+        Selection.Clear();
+        Selection.UnionWith(pasted);
+        if (pasted.Count > 0) PlayheadFrame = pasted.Max(c => c.End); // like Premiere: ready to paste again after it
+        SelectionChanged();
+        NotifyContentChanged();
+    }
+
+    /// <summary>Box-select: selects these clips (and their linked partners), optionally added to the clips already selected.</summary>
+    public void SelectClips(IEnumerable<Clip> clips, IReadOnlyCollection<Clip> keep)
+    {
+        Selection.Clear();
+        Selection.UnionWith(keep);
+        foreach (Clip c in clips)
+            Selection.UnionWith(Project.LinkedGroup(c).Where(x => !IsLocked(x)));
+        SelectionChanged();
     }
 
     // ===================== Cutting and deleting =====================

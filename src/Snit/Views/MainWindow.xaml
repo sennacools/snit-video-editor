@@ -69,6 +69,10 @@
                         <MenuItem Header="Undo" InputGestureText="Ctrl+Z" Command="{Binding Timeline.UndoCommand}"/>
                         <MenuItem Header="Redo" InputGestureText="Ctrl+Shift+Z" Command="{Binding Timeline.RedoCommand}"/>
                         <Separator/>
+                        <MenuItem Header="Cut" InputGestureText="Ctrl+X" Command="{Binding Timeline.CutCommand}"/>
+                        <MenuItem Header="Copy" InputGestureText="Ctrl+C" Command="{Binding Timeline.CopyCommand}"/>
+                        <MenuItem Header="Paste" InputGestureText="Ctrl+V" Command="{Binding Timeline.PasteCommand}"/>
+                        <Separator/>
                         <MenuItem Header="Delete" InputGestureText="Del" Command="{Binding Timeline.DeleteSelectionCommand}"/>
                         <MenuItem Header="Ripple delete" InputGestureText="Shift+Del" Command="{Binding Timeline.RippleDeleteSelectionCommand}"/>
                     </MenuItem>

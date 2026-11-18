@@ -37,7 +37,18 @@ public class ExportRunTests(TestMedia media) : IClassFixture<TestMedia>
         Assert.True(result.HasAudio);
         Assert.Equal(225, plan.TotalFrames);
     }
+}
 
+/// <summary>
+/// Measuring how fast Stop works only makes sense when the computer isn't busy with a dozen other
+/// exports at the same time (as happens on GitHub's small build machines), so this runs on its own.
+/// </summary>
+[CollectionDefinition("Timing", DisableParallelization = true)]
+public class TimingCollection : ICollectionFixture<TestMedia>;
+
+[Collection("Timing")]
+public class CancelTiming(TestMedia media)
+{
     [Fact]
     public async Task Cancelling_stops_ffmpeg_and_removes_the_half_file()
     {

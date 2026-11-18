@@ -25,6 +25,19 @@ public sealed class Exporter
 {
     public async Task RunAsync(ExportPlan plan, IProgress<ExportProgress>? progress, CancellationToken cancel)
     {
+        try
+        {
+            await RunCoreAsync(plan, progress, cancel);
+        }
+        finally
+        {
+            // Title pictures were only needed during the export.
+            foreach (string file in plan.TempFiles) TryDelete(file);
+        }
+    }
+
+    private async Task RunCoreAsync(ExportPlan plan, IProgress<ExportProgress>? progress, CancellationToken cancel)
+    {
         string ffmpeg = FFmpegLocator.Current.FfmpegPath ?? throw new InvalidOperationException("FFmpeg isn't installed.");
         string output = plan.Arguments[^1];
 

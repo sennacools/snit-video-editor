@@ -1,9 +1,14 @@
+using System.IO;
 using Snit.Core;
 
 namespace Snit.Services;
 
-/// <summary>Everything needed to run one export: the ffmpeg arguments and how many frames to expect.</summary>
-public sealed record ExportPlan(IReadOnlyList<string> Arguments, string FilterGraph, long TotalFrames, double DurationSeconds);
+/// <summary>
+/// Everything needed to run one export: the ffmpeg arguments, how many frames to expect,
+/// and temporary files (title pictures) to delete afterwards.
+/// </summary>
+public sealed record ExportPlan(IReadOnlyList<string> Arguments, string FilterGraph, long TotalFrames, double DurationSeconds,
+    IReadOnlyList<string> TempFiles);
 
 /// <summary>
 /// Turns the timeline into one ffmpeg command.
@@ -12,6 +17,7 @@ public sealed record ExportPlan(IReadOnlyList<string> Arguments, string FilterGr
 /// 1. Every clip becomes an input, cut to the right part of its file ("-ss" start, "-t" length).
 /// 2. Video: a black background the length of the timeline, with each clip resized to the
 ///    export size and laid on top at its place in time. Lower tracks first, so V2 covers V1.
+///    Titles are drawn into see-through PNG pictures first and laid on top like images.
 /// 3. Audio: every clip's sound is delayed to its place and all of it is mixed together.
 /// The recipe for steps 2 and 3 is ffmpeg's "filter_complex" text.
 /// </summary>
@@ -19,7 +25,8 @@ public static class ExportCommandBuilder
 {
     private const int SampleRate = 48000;
 
-    public static ExportPlan Build(Project project, ExportSettings settings)
+    /// <param name="workFolder">Where to put title pictures (a new temporary folder when left out).</param>
+    public static ExportPlan Build(Project project, ExportSettings settings, string? workFolder = null)
     {
         if (settings.Format != ExportFormat.Mp4H264)
             throw new NotSupportedException("Only MP4 (H.264) export is available so far.");
@@ -39,7 +46,13 @@ public static class ExportCommandBuilder
 
         var args = new List<string> { "-hide_banner", "-nostdin", "-y" };
         var filters = new List<string>();
+        var tempFiles = new List<string>();
         int input = 0;
+
+        // Titles are drawn at the size the video frame will have inside the export,
+        // so letters are sharp (also in 4K) and sit exactly where the preview shows them.
+        double fit = Math.Min((double)w / project.Settings.Width, (double)h / project.Settings.Height);
+        int titleW = (int)Math.Round(project.Settings.Width * fit), titleH = (int)Math.Round(project.Settings.Height * fit);
 
         // ---- Video ----
         filters.Add($"color=c=black:s={w}x{h}:r={fps}:d={ProcessRunner.Num(duration)}[base]");
@@ -49,16 +62,28 @@ public static class ExportCommandBuilder
         var videoTracks = project.Tracks.Where(t => t.Kind == TrackKind.Video && !t.IsOff).Reverse();
         foreach (Clip clip in videoTracks.SelectMany(t => t.Clips.OrderBy(c => c.Start)))
         {
-            if (clip.Media.Kind == MediaKind.Image)
+            bool isStill = clip.Media.Kind is MediaKind.Image or MediaKind.Text;
+            if (clip.Title is TitleStyle title)
+            {
+                workFolder ??= Directory.CreateTempSubdirectory("snit-export-").FullName;
+                string png = Path.Combine(workFolder, $"title-{input}.png");
+                TitleRenderer.SavePng(title, titleW, titleH, png);
+                tempFiles.Add(png);
+                args.AddRange(["-loop", "1", "-framerate", fps, "-t", Sec(clip.Length), "-i", png]);
+            }
+            else if (isStill)
                 args.AddRange(["-loop", "1", "-framerate", fps, "-t", Sec(clip.Length), "-i", clip.Media.FilePath]);
             else
                 args.AddRange(["-ss", Sec(clip.In), "-t", Sec(clip.Length), "-i", clip.Media.FilePath]);
 
+            // Pictures and titles keep their see-through parts (alpha); video is solid.
+            string padColor = isStill ? ":color=black@0" : "";
+            string pixelFormat = isStill ? "yuva420p" : "yuv420p";
             string label = $"v{input}";
             filters.Add(
                 $"[{input}:v:0]fps={fps}," +
-                $"scale={w}:{h}:force_original_aspect_ratio=decrease,pad={w}:{h}:(ow-iw)/2:(oh-ih)/2,setsar=1," +
-                $"format=yuv420p,setpts=PTS-STARTPTS+{Sec(clip.Start)}/TB[{label}]");
+                $"scale={w}:{h}:force_original_aspect_ratio=decrease,pad={w}:{h}:(ow-iw)/2:(oh-ih)/2{padColor},setsar=1," +
+                $"format={pixelFormat},setpts=PTS-STARTPTS+{Sec(clip.Start)}/TB[{label}]");
 
             string next = $"o{input}";
             // eof_action=pass: once the clip ends, the picture underneath shows again.
@@ -102,7 +127,7 @@ public static class ExportCommandBuilder
                        settings.OutputPath]);
 
         long totalFrames = (long)Math.Round(duration * settings.FrameRate);
-        return new ExportPlan(args, graph, totalFrames, duration);
+        return new ExportPlan(args, graph, totalFrames, duration, tempFiles);
     }
 
     /// <summary>Settings for the chosen video encoder. The bitrate is the "quality" slider.</summary>

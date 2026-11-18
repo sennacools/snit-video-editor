@@ -28,7 +28,8 @@ public static class PreviewPlan
     {
         // Tracks are listed top to bottom, so the first one that has a clip wins.
         var tracks = project.Tracks.Where(t => t.Kind == TrackKind.Video && !t.IsOff).ToList();
-        var clips = tracks.SelectMany(t => t.Clips).Where(c => !c.Media.IsOffline).ToList();
+        // Titles are see-through and drawn on top separately, so they don't count here.
+        var clips = tracks.SelectMany(t => t.Clips).Where(c => !c.Media.IsOffline && !c.IsTitle).ToList();
 
         var edges = clips.SelectMany(c => new[] { c.Start, c.End }).Distinct().Order().ToList();
         var segments = new List<VideoSegment>();
@@ -37,7 +38,7 @@ public static class PreviewPlan
         {
             long from = edges[i], to = edges[i + 1];
             Clip? top = tracks
-                .Select(t => t.Clips.FirstOrDefault(c => c.Start <= from && c.End > from && !c.Media.IsOffline))
+                .Select(t => t.Clips.FirstOrDefault(c => c.Start <= from && c.End > from && !c.Media.IsOffline && !c.IsTitle))
                 .FirstOrDefault(c => c is not null);
             if (top is null) continue;
 
@@ -59,6 +60,12 @@ public static class PreviewPlan
         }
         return segments;
     }
+
+    /// <summary>The titles visible at a frame, bottom track first (so later ones are drawn on top).</summary>
+    public static IReadOnlyList<Clip> TitlesAt(Project project, long frame)
+        => project.Tracks.Where(t => t.Kind == TrackKind.Video && !t.IsOff).Reverse()
+            .SelectMany(t => t.Clips.Where(c => c.IsTitle && c.Start <= frame && frame < c.End))
+            .ToList();
 
     /// <summary>All clips on audio tracks that are not muted.</summary>
     public static IReadOnlyList<AudioPiece> BuildAudio(Project project)

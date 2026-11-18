@@ -315,12 +315,13 @@ public partial class TimelineViewModel : ObservableObject
     /// </summary>
     public void AddMedia(MediaItem media, Track track, long start)
     {
-        // Pictures and video go on video tracks, sound on audio tracks.
+        // Pictures and video go on video tracks (titles on V2), sound on audio tracks.
         if (media.Kind == MediaKind.Audio && track.Kind != TrackKind.Audio) track = Project.TrackByName("A1");
-        if (media.Kind != MediaKind.Audio && track.Kind != TrackKind.Video) track = Project.TrackByName("V1");
+        if (media.Kind != MediaKind.Audio && track.Kind != TrackKind.Video)
+            track = Project.TrackByName(media.Kind == MediaKind.Text ? "V2" : "V1");
         if (track.IsLocked) return;
 
-        long length = media.Kind == MediaKind.Image
+        long length = media.Kind is MediaKind.Image or MediaKind.Text
             ? (long)Math.Round(MediaImporter.DefaultImageSeconds * Fps)
             : media.LengthInFrames(Fps);
 
@@ -328,7 +329,11 @@ public partial class TimelineViewModel : ObservableObject
         Guid? link = media.Kind == MediaKind.Video && media.HasAudio ? Guid.NewGuid() : null;
         var placed = new List<Clip>();
 
-        var clip = new Clip { Media = media, Start = start, In = 0, Length = length, LinkId = link };
+        var clip = new Clip
+        {
+            Media = media, Start = start, In = 0, Length = length, LinkId = link,
+            Title = media.Kind == MediaKind.Text ? new TitleStyle() : null,
+        };
         TimelineEdits.ClearRange(track, clip.Start, clip.End, []);
         track.Clips.Add(clip);
         placed.Add(clip);
@@ -355,6 +360,10 @@ public partial class TimelineViewModel : ObservableObject
         SelectionChanged();
         NotifyContentChanged();
     }
+
+    /// <summary>Adds a new title (5 seconds, on V2) at the playhead.</summary>
+    [RelayCommand]
+    private void AddTitleAtPlayhead() => AddMedia(MediaItem.Title, Project.TrackByName("V2"), PlayheadFrame);
 
     /// <summary>Removes every clip that uses this media file (when it's removed from the bin).</summary>
     public void RemoveClipsUsing(MediaItem media)

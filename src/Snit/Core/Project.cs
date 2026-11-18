@@ -9,7 +9,8 @@ namespace Snit.Core;
 // Times on the timeline are counted in whole frames (at the project frame rate),
 // so cuts always land exactly on a frame and numbers never drift.
 
-public enum MediaKind { Video, Audio, Image }
+/// <summary>Text = a title made in Snit (no file).</summary>
+public enum MediaKind { Video, Audio, Image, Text }
 
 public enum TrackKind { Video, Audio }
 
@@ -65,9 +66,15 @@ public partial class MediaItem : ObservableObject
         }
     }
 
-    /// <summary>How many frames of this file can be used. Pictures can be stretched to any length.</summary>
+    /// <summary>
+    /// The stand-in "file" that every title clip points to. Titles have no real file;
+    /// their text and look are stored in the clip itself (<see cref="Clip.Title"/>).
+    /// </summary>
+    public static MediaItem Title { get; } = new() { Id = Guid.Empty, FilePath = "Title", Kind = MediaKind.Text };
+
+    /// <summary>How many frames of this file can be used. Pictures and titles can be stretched to any length.</summary>
     public long LengthInFrames(double fps)
-        => Kind == MediaKind.Image ? long.MaxValue : Math.Max(1, (long)Math.Floor(DurationSeconds * fps + 1e-6));
+        => Kind is MediaKind.Image or MediaKind.Text ? long.MaxValue : Math.Max(1, (long)Math.Floor(DurationSeconds * fps + 1e-6));
 }
 
 /// <summary>A piece of a media file placed on a track.</summary>
@@ -99,10 +106,48 @@ public sealed class Clip
     /// <summary>Seconds over which the sound falls to silence at the end of the clip.</summary>
     public double FadeOutSeconds { get; set; }
 
-    public long End => Start + Length;
-    public string Name => Media.Name;
+    /// <summary>For title clips: the text and how it looks. Null for normal clips.</summary>
+    public TitleStyle? Title { get; set; }
 
-    public Clip Copy() => (Clip)MemberwiseClone();
+    public long End => Start + Length;
+    public bool IsTitle => Title is not null;
+    public string Name => Title is { } t ? FirstLine(t.Text) : Media.Name;
+
+    public Clip Copy()
+    {
+        var copy = (Clip)MemberwiseClone();
+        copy.Title = Title?.Copy(); // a separate copy, so undo keeps the old text
+        return copy;
+    }
+
+    private static string FirstLine(string text)
+    {
+        string line = text.Split('\n')[0].Trim();
+        return line.Length == 0 ? "Title" : line;
+    }
+}
+
+/// <summary>The text and look of a title clip.</summary>
+public sealed class TitleStyle
+{
+    public string Text { get; set; } = "Your title";
+    public string FontFamily { get; set; } = "Segoe UI";
+
+    /// <summary>Letter size in pixels, measured in a 1080-pixel-high picture (it scales with the export size).</summary>
+    public double FontSize { get; set; } = 96;
+
+    /// <summary>Colour as #RRGGBB.</summary>
+    public string Color { get; set; } = "#FFFFFF";
+    public bool Bold { get; set; } = true;
+
+    /// <summary>A soft dark shadow behind the letters, so they stay readable on bright video.</summary>
+    public bool Shadow { get; set; } = true;
+
+    /// <summary>Where the middle of the text sits: 0 = left/top edge, 0.5 = centre, 1 = right/bottom edge.</summary>
+    public double X { get; set; } = 0.5;
+    public double Y { get; set; } = 0.5;
+
+    public TitleStyle Copy() => (TitleStyle)MemberwiseClone();
 }
 
 /// <summary>One row on the timeline (V2, V1, A1, A2).</summary>

@@ -41,6 +41,20 @@ public static class ProjectFile
         public double VolumeDb { get; init; }
         public double FadeIn { get; init; }
         public double FadeOut { get; init; }
+        public TitleData? Title { get; init; }
+    }
+
+    /// <summary>The text and look of a title clip (titles have no media file).</summary>
+    private sealed class TitleData
+    {
+        public string Text { get; init; } = "";
+        public string FontFamily { get; init; } = "Segoe UI";
+        public double FontSize { get; init; } = 96;
+        public string Color { get; init; } = "#FFFFFF";
+        public bool Bold { get; init; } = true;
+        public bool Shadow { get; init; } = true;
+        public double X { get; init; } = 0.5;
+        public double Y { get; init; } = 0.5;
     }
 
     // ---- Save ----
@@ -62,6 +76,11 @@ public static class ProjectFile
                     {
                         Id = c.Id, MediaId = c.Media.Id, Start = c.Start, In = c.In, Length = c.Length, LinkId = c.LinkId,
                         VolumeDb = c.VolumeDb, FadeIn = c.FadeInSeconds, FadeOut = c.FadeOutSeconds,
+                        Title = c.Title is { } t ? new TitleData
+                        {
+                            Text = t.Text, FontFamily = t.FontFamily, FontSize = t.FontSize, Color = t.Color,
+                            Bold = t.Bold, Shadow = t.Shadow, X = t.X, Y = t.Y,
+                        } : null,
                     }).ToList())).ToList());
 
         // Write to a temporary file first, so a crash halfway never leaves a broken project.
@@ -121,11 +140,18 @@ public static class ProjectFile
             track.IsLocked = t.IsLocked;
             foreach (var c in t.Clips)
             {
-                if (!mediaById.TryGetValue(c.MediaId, out var media)) continue;
+                // Titles have no media file; they all use the stand-in "Title" item.
+                MediaItem? media = c.Title is not null ? MediaItem.Title : mediaById.GetValueOrDefault(c.MediaId);
+                if (media is null) continue;
                 track.Clips.Add(new Clip
                 {
                     Id = c.Id, Media = media, Start = c.Start, In = c.In, Length = c.Length, LinkId = c.LinkId,
                     VolumeDb = c.VolumeDb, FadeInSeconds = c.FadeIn, FadeOutSeconds = c.FadeOut,
+                    Title = c.Title is { } d ? new TitleStyle
+                    {
+                        Text = d.Text, FontFamily = d.FontFamily, FontSize = d.FontSize, Color = d.Color,
+                        Bold = d.Bold, Shadow = d.Shadow, X = d.X, Y = d.Y,
+                    } : null,
                 });
             }
         }

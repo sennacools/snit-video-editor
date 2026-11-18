@@ -109,7 +109,7 @@
                         </StackPanel>
                         <StackPanel Grid.Column="2">
                             <TextBlock Text="Resolution" Style="{StaticResource FieldLabel}"/>
-                            <ComboBox ItemsSource="{Binding Resolutions}" SelectedItem="{Binding SelectedResolution}"
+                            <ComboBox ItemsSource="{Binding Resolutions}" SelectedItem="{Binding SelectedResolution}" IsEnabled="{Binding HasPicture}"
                                       DisplayMemberPath="Label" ItemContainerStyle="{StaticResource ChoiceItem}"/>
                         </StackPanel>
                     </Grid>
@@ -122,7 +122,7 @@
                         </Grid.ColumnDefinitions>
                         <StackPanel>
                             <TextBlock Text="Frame rate" Style="{StaticResource FieldLabel}"/>
-                            <ComboBox ItemsSource="{Binding FrameRates}" SelectedItem="{Binding SelectedFrameRate}"
+                            <ComboBox ItemsSource="{Binding FrameRates}" SelectedItem="{Binding SelectedFrameRate}" IsEnabled="{Binding HasPicture}"
                                       DisplayMemberPath="Label" ItemContainerStyle="{StaticResource ChoiceItem}"/>
                         </StackPanel>
                         <StackPanel Grid.Column="2">
@@ -144,10 +144,11 @@
                     <DockPanel>
                         <TextBlock DockPanel.Dock="Right" Text="{Binding BitrateText}" Style="{StaticResource TimecodeText}"
                                    FontSize="11" Width="70" TextAlignment="Right"/>
-                        <Slider Minimum="0" Maximum="100" Value="{Binding Quality}" Margin="0,0,8,0"/>
+                        <Slider Minimum="0" Maximum="100" Value="{Binding Quality}" Margin="0,0,8,0" IsEnabled="{Binding HasQuality}"
+                                ToolTipService.ShowOnDisabled="True" ToolTip="Fixed quality for this format"/>
                     </DockPanel>
 
-                    <CheckBox Margin="0,16,0,0" IsChecked="{Binding UseGpu}" IsEnabled="{Binding IsGpuAvailable}">
+                    <CheckBox Margin="0,16,0,0" IsChecked="{Binding UseGpu}" IsEnabled="{Binding CanUseGpu}">
                         <StackPanel>
                             <TextBlock Text="Use GPU encoding when available"/>
                             <TextBlock Text="{Binding GpuStatus}" Style="{StaticResource MutedText}" Margin="0,2,0,0"/>

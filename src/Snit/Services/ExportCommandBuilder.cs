@@ -28,9 +28,6 @@ public static class ExportCommandBuilder
     /// <param name="workFolder">Where to put title pictures (a new temporary folder when left out).</param>
     public static ExportPlan Build(Project project, ExportSettings settings, string? workFolder = null)
     {
-        if (settings.Format != ExportFormat.Mp4H264)
-            throw new NotSupportedException("Only MP4 (H.264) export is available so far.");
-
         double projectFps = project.Fps;
         if (project.DurationFrames <= 0)
             throw new InvalidOperationException("The timeline is empty.");
@@ -63,13 +60,17 @@ public static class ExportCommandBuilder
         double fit = Math.Min((double)w / project.Settings.Width, (double)h / project.Settings.Height);
         int titleW = (int)Math.Round(project.Settings.Width * fit), titleH = (int)Math.Round(project.Settings.Height * fit);
 
+        // GIFs have no sound and MP3s have no picture: those parts are left out completely.
+        bool wantVideo = settings.Format != ExportFormat.Mp3;
+        bool wantAudio = settings.Format != ExportFormat.Gif;
+
         // ---- Video ----
         filters.Add($"color=c=black:s={w}x{h}:r={fps}:d={ProcessRunner.Num(timelineEnd)}[base]");
         string current = "base";
 
         // Bottom track first, so higher tracks end up on top.
         var videoTracks = project.Tracks.Where(t => t.Kind == TrackKind.Video && !t.IsOff).Reverse();
-        foreach (Clip clip in videoTracks.SelectMany(t => t.Clips.Where(InRange).OrderBy(c => c.Start)))
+        foreach (Clip clip in wantVideo ? videoTracks.SelectMany(t => t.Clips.Where(InRange).OrderBy(c => c.Start)) : [])
         {
             bool isStill = clip.Media.Kind is MediaKind.Image or MediaKind.Text;
             if (clip.Title is TitleStyle title)
@@ -111,12 +112,19 @@ public static class ExportCommandBuilder
         // Keep only the chosen range (and start its timestamps at zero).
         string keepRange = isRange ? $"trim=start={Sec(rangeStart)}:end={Sec(rangeEnd)},setpts=PTS-STARTPTS," : "";
         filters.Add($"[{current}]{keepRange}format=yuv420p[vout]");
+        if (settings.Format == ExportFormat.Gif)
+        {
+            // GIFs have at most 256 colours: first find the best 256 for this video, then use them.
+            filters.Add("[vout]split[gifa][gifb];[gifa]palettegen=stats_mode=diff[palette];" +
+                        "[gifb][palette]paletteuse=dither=bayer:bayer_scale=5[gif]");
+        }
+        if (!wantVideo) filters.Clear();
 
         // ---- Audio ----
         var audioClips = project.Tracks.Where(t => t.Kind == TrackKind.Audio && !t.IsOff)
             .SelectMany(t => t.Clips.Where(InRange).OrderBy(c => c.Start)).ToList();
         var audioLabels = new List<string>();
-        foreach (Clip clip in audioClips)
+        foreach (Clip clip in wantAudio ? audioClips : [])
         {
             args.AddRange(["-ss", Sec(clip.In), "-t", Sec(clip.SourceLength), "-i", clip.Media.FilePath]);
             long delayMs = (long)Math.Round(clip.Start / projectFps * 1000);
@@ -132,7 +140,8 @@ public static class ExportCommandBuilder
 
         string exactLength = $"apad,atrim=0:{ProcessRunner.Num(timelineEnd)}" +
                              (isRange ? $",atrim=start={Sec(rangeStart)},asetpts=PTS-STARTPTS" : "");
-        if (audioLabels.Count == 0)
+        if (!wantAudio) { }
+        else if (audioLabels.Count == 0)
             filters.Add($"anullsrc=r={SampleRate}:cl=stereo,atrim=0:{ProcessRunner.Num(duration)}[aout]");
         else
             filters.Add($"{string.Concat(audioLabels.Select(l => $"[{l}]"))}" +
@@ -141,32 +150,67 @@ public static class ExportCommandBuilder
         string graph = string.Join(";\n", filters);
 
         // ---- Output ----
-        args.AddRange(["-filter_complex", graph, "-map", "[vout]", "-map", "[aout]"]);
-        args.AddRange(VideoEncoderArguments(settings));
-        args.AddRange(["-r", fps,
-                       "-c:a", "aac", "-b:a", $"{settings.AudioBitrateKbps}k", "-ar", SampleRate.ToString(),
-                       "-movflags", "+faststart",
-                       "-progress", "pipe:1", "-nostats",
-                       settings.OutputPath]);
+        args.AddRange(["-filter_complex", graph]);
+        if (wantVideo) args.AddRange(["-map", settings.Format == ExportFormat.Gif ? "[gif]" : "[vout]"]);
+        if (wantAudio) args.AddRange(["-map", "[aout]"]);
+        args.AddRange(FormatArguments(settings));
+        if (wantVideo) args.AddRange(["-r", fps]);
+        args.AddRange(["-progress", "pipe:1", "-nostats", settings.OutputPath]);
 
         long totalFrames = (long)Math.Round(duration * settings.FrameRate);
         return new ExportPlan(args, graph, totalFrames, duration, tempFiles);
     }
 
-    /// <summary>Settings for the chosen video encoder. The bitrate is the "quality" slider.</summary>
-    private static IEnumerable<string> VideoEncoderArguments(ExportSettings s)
+    /// <summary>The usual file extension for each format.</summary>
+    public static string Extension(ExportFormat format) => format switch
+    {
+        ExportFormat.WebmVp9 => ".webm",
+        ExportFormat.MovProRes => ".mov",
+        ExportFormat.Gif => ".gif",
+        ExportFormat.Mp3 => ".mp3",
+        _ => ".mp4",
+    };
+
+    /// <summary>Encoder settings per format. For H.264, H.265 and VP9 the bitrate is the "quality" slider.</summary>
+    private static IEnumerable<string> FormatArguments(ExportSettings s)
     {
         string rate = ProcessRunner.Num(s.VideoBitrateMbps) + "M";
         string max = ProcessRunner.Num(s.VideoBitrateMbps * 1.5) + "M";
         string buffer = ProcessRunner.Num(s.VideoBitrateMbps * 2) + "M";
-        var common = new[] { "-b:v", rate, "-maxrate", max, "-bufsize", buffer };
+        string[] bitrate = ["-b:v", rate, "-maxrate", max, "-bufsize", buffer];
+        string[] aac = ["-c:a", "aac", "-b:a", $"{s.AudioBitrateKbps}k", "-ar", SampleRate.ToString()];
+        string[] mp4 = ["-movflags", "+faststart"]; // lets the video start playing before it has fully downloaded
 
-        return s.VideoEncoder switch
+        return s.Format switch
         {
-            "h264_nvenc" => ["-c:v", "h264_nvenc", "-preset", "p5", .. common, "-pix_fmt", "yuv420p"],
-            "h264_qsv" => ["-c:v", "h264_qsv", "-preset", "medium", .. common, "-pix_fmt", "nv12"],
-            "h264_amf" => ["-c:v", "h264_amf", "-quality", "balanced", .. common, "-pix_fmt", "yuv420p"],
-            _ => ["-c:v", "libx264", "-preset", "medium", "-profile:v", "high", .. common, "-pix_fmt", "yuv420p"],
+            ExportFormat.Mp4H264 => [.. H264(s.VideoEncoder, bitrate), .. aac, .. mp4],
+            // hvc1 tag: so Apple devices recognise the H.265 video.
+            ExportFormat.Mp4H265 => [.. H265(s.VideoEncoder, bitrate), "-tag:v", "hvc1", .. aac, .. mp4],
+            ExportFormat.WebmVp9 => ["-c:v", "libvpx-vp9", .. bitrate, "-row-mt", "1", "-deadline", "good", "-cpu-used", "2",
+                                     "-pix_fmt", "yuv420p", "-c:a", "libopus", "-b:a", "192k"],
+            // ProRes 422 HQ: fixed high quality for further editing; uncompressed sound.
+            ExportFormat.MovProRes => ["-c:v", "prores_ks", "-profile:v", "3", "-pix_fmt", "yuv422p10le",
+                                       "-c:a", "pcm_s16le", "-ar", SampleRate.ToString()],
+            ExportFormat.Gif => ["-loop", "0"], // play forever
+            ExportFormat.Mp3 => ["-c:a", "libmp3lame", "-b:a", "320k", "-ar", "44100"],
+            _ => throw new NotSupportedException(),
         };
     }
+
+    private static string[] H264(string encoder, string[] bitrate) => encoder switch
+    {
+        "h264_nvenc" => ["-c:v", "h264_nvenc", "-preset", "p5", .. bitrate, "-pix_fmt", "yuv420p"],
+        "h264_qsv" => ["-c:v", "h264_qsv", "-preset", "medium", .. bitrate, "-pix_fmt", "nv12"],
+        "h264_amf" => ["-c:v", "h264_amf", "-quality", "balanced", .. bitrate, "-pix_fmt", "yuv420p"],
+        _ => ["-c:v", "libx264", "-preset", "medium", "-profile:v", "high", .. bitrate, "-pix_fmt", "yuv420p"],
+    };
+
+    /// <summary>H.265 on the same graphics card as found for H.264 (h264_nvenc → hevc_nvenc), or the processor.</summary>
+    private static string[] H265(string encoder, string[] bitrate) => encoder switch
+    {
+        "h264_nvenc" => ["-c:v", "hevc_nvenc", "-preset", "p5", .. bitrate, "-pix_fmt", "yuv420p"],
+        "h264_qsv" => ["-c:v", "hevc_qsv", "-preset", "medium", .. bitrate, "-pix_fmt", "nv12"],
+        "h264_amf" => ["-c:v", "hevc_amf", "-quality", "balanced", .. bitrate, "-pix_fmt", "yuv420p"],
+        _ => ["-c:v", "libx265", "-preset", "medium", .. bitrate, "-pix_fmt", "yuv420p"],
+    };
 }

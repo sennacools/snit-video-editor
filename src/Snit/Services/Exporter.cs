@@ -70,8 +70,13 @@ public sealed class Exporter
         {
             while (await process.StandardOutput.ReadLineAsync() is string line)
             {
-                if (line.StartsWith("frame=") && long.TryParse(line.AsSpan(6), out long frame))
-                    progress?.Report(new ExportProgress(Math.Min(frame, plan.TotalFrames), plan.TotalFrames, clock.Elapsed));
+                // "out_time_us" = how much of the video (in microseconds) is written. It works for
+                // every format, also for MP3 where there are no frames to count.
+                if (line.StartsWith("out_time_us=") && long.TryParse(line.AsSpan(12), out long microseconds) && plan.DurationSeconds > 0)
+                {
+                    double done = Math.Clamp(microseconds / 1e6 / plan.DurationSeconds, 0, 1);
+                    progress?.Report(new ExportProgress((long)Math.Round(done * plan.TotalFrames), plan.TotalFrames, clock.Elapsed));
+                }
             }
         });
 

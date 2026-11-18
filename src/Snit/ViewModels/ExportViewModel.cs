@@ -54,11 +54,11 @@ public partial class ExportViewModel : ObservableObject
     public IReadOnlyList<Choice<ExportFormat>> Formats { get; } =
     [
         new("MP4 · H.264", ExportFormat.Mp4H264),
-        new("MP4 · H.265 (coming later)", ExportFormat.Mp4H265, false),
-        new("WebM · VP9 (coming later)", ExportFormat.WebmVp9, false),
-        new("MOV · ProRes (coming later)", ExportFormat.MovProRes, false),
-        new("GIF (coming later)", ExportFormat.Gif, false),
-        new("Audio only · MP3 (coming later)", ExportFormat.Mp3, false),
+        new("MP4 · H.265 (smaller files)", ExportFormat.Mp4H265),
+        new("WebM · VP9 (for the web)", ExportFormat.WebmVp9),
+        new("MOV · ProRes 422 HQ (for editing)", ExportFormat.MovProRes),
+        new("GIF (no sound)", ExportFormat.Gif),
+        new("Audio only · MP3", ExportFormat.Mp3),
     ];
 
     public IReadOnlyList<Choice<(int Width, int Height)>> Resolutions { get; } =
@@ -74,8 +74,20 @@ public partial class ExportViewModel : ObservableObject
         new("24 fps", 24), new("25 fps", 25), new("30 fps", 30), new("60 fps", 60),
     ];
 
-    [ObservableProperty, NotifyPropertyChangedFor(nameof(VideoSummary))]
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(VideoSummary), nameof(AudioSummary), nameof(EstimatedSize),
+        nameof(HasPicture), nameof(HasQuality), nameof(CanUseGpu), nameof(Extension))]
     private Choice<ExportFormat> selectedFormat;
+
+    /// <summary>MP3 has no picture: resolution and frame rate don't matter then.</summary>
+    public bool HasPicture => SelectedFormat.Value != ExportFormat.Mp3;
+
+    /// <summary>The quality slider only works for H.264, H.265 and VP9 (ProRes, GIF and MP3 have fixed quality).</summary>
+    public bool HasQuality => SelectedFormat.Value is ExportFormat.Mp4H264 or ExportFormat.Mp4H265 or ExportFormat.WebmVp9;
+
+    /// <summary>The graphics card can make H.264 and H.265.</summary>
+    public bool CanUseGpu => IsGpuAvailable && SelectedFormat.Value is ExportFormat.Mp4H264 or ExportFormat.Mp4H265;
+
+    public string Extension => ExportCommandBuilder.Extension(SelectedFormat.Value);
 
     [ObservableProperty, NotifyPropertyChangedFor(nameof(BitrateMbps), nameof(BitrateText), nameof(VideoSummary), nameof(EstimatedSize))]
     private Choice<(int Width, int Height)> selectedResolution;
@@ -101,7 +113,7 @@ public partial class ExportViewModel : ObservableObject
     [ObservableProperty, NotifyPropertyChangedFor(nameof(VideoSummary))]
     private bool useGpu;
 
-    [ObservableProperty]
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(CanUseGpu))]
     private bool isGpuAvailable;
 
     [ObservableProperty]
@@ -134,15 +146,43 @@ public partial class ExportViewModel : ObservableObject
 
     public string DurationText => Timecode.FromFrames(ExportFrames, project.Fps);
 
-    public string VideoSummary => $"H.264 · {BitrateText}{(UseGpu && IsGpuAvailable ? " · graphics card" : "")}";
+    private bool GpuInUse => UseGpu && CanUseGpu;
 
-    public string AudioSummary => "AAC · 320 kbps · stereo";
+    public string VideoSummary => SelectedFormat.Value switch
+    {
+        ExportFormat.Mp4H264 => $"H.264 · {BitrateText}{(GpuInUse ? " · graphics card" : "")}",
+        ExportFormat.Mp4H265 => $"H.265 · {BitrateText}{(GpuInUse ? " · graphics card" : "")}",
+        ExportFormat.WebmVp9 => $"VP9 · {BitrateText}",
+        ExportFormat.MovProRes => "ProRes 422 HQ",
+        ExportFormat.Gif => "GIF · 256 colours",
+        _ => "none",
+    };
 
+    public string AudioSummary => SelectedFormat.Value switch
+    {
+        ExportFormat.WebmVp9 => "Opus · 192 kbps · stereo",
+        ExportFormat.MovProRes => "PCM (uncompressed) · stereo",
+        ExportFormat.Gif => "none (GIFs have no sound)",
+        ExportFormat.Mp3 => "MP3 · 320 kbps · stereo",
+        _ => "AAC · 320 kbps · stereo",
+    };
+
+    /// <summary>A rough guess of the file size (megabits per second × seconds ÷ 8).</summary>
     public string EstimatedSize
     {
         get
         {
-            double megabytes = (BitrateMbps + 0.32) * DurationSeconds / 8;
+            var (w, h) = SelectedResolution.Value;
+            double pixelsPerSecond = w * h * SelectedFrameRate.Value;
+            double mbps = SelectedFormat.Value switch
+            {
+                ExportFormat.MovProRes => 220 * pixelsPerSecond / (1920.0 * 1080 * 30) + 1.5, // ProRes HQ ≈ 220 Mbps at 1080p30
+                ExportFormat.Gif => 0.5 * pixelsPerSecond / 1e6,                                 // very rough: GIFs vary a lot
+                ExportFormat.Mp3 => 0.32,
+                ExportFormat.WebmVp9 => BitrateMbps + 0.19,
+                _ => BitrateMbps + 0.32,
+            };
+            double megabytes = mbps * DurationSeconds / 8;
             return megabytes >= 1000 ? $"≈ {megabytes / 1000:0.0} GB" : $"≈ {Math.Max(1, megabytes):0} MB";
         }
     }
@@ -201,7 +241,7 @@ public partial class ExportViewModel : ObservableObject
     private async Task ExportAsync()
     {
         string name = FileName.Trim();
-        if (name.EndsWith(".mp4", StringComparison.OrdinalIgnoreCase)) name = name[..^4];
+        if (name.EndsWith(Extension, StringComparison.OrdinalIgnoreCase)) name = name[..^Extension.Length];
         if (name.Length == 0 || name.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0)
         {
             ShowError("Please choose a file name without characters like \\ / : * ? \" < > |");
@@ -213,9 +253,9 @@ public partial class ExportViewModel : ObservableObject
             return;
         }
 
-        string output = Path.Combine(Folder, name + ".mp4");
+        string output = Path.Combine(Folder, name + Extension);
         if (File.Exists(output) &&
-            MessageBox.Show($"{name}.mp4 already exists. Replace it?", "Export", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+            MessageBox.Show($"{name}{Extension} already exists. Replace it?", "Export", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
             return;
 
         var settings = new ExportSettings
@@ -226,7 +266,7 @@ public partial class ExportViewModel : ObservableObject
             Height = SelectedResolution.Value.Height,
             FrameRate = SelectedFrameRate.Value,
             VideoBitrateMbps = BitrateMbps,
-            VideoEncoder = UseGpu && gpuEncoder is not null ? gpuEncoder : "libx264",
+            VideoEncoder = GpuInUse && gpuEncoder is not null ? gpuEncoder : "libx264",
             RangeStart = WholeSequence || !CanUseRange ? null : project.InPoint,
             RangeEnd = WholeSequence || !CanUseRange ? null : project.OutPoint,
         };
@@ -258,7 +298,7 @@ public partial class ExportViewModel : ObservableObject
             IsDone = true;
             ProgressValue = 1;
             TimeLeftText = "";
-            StatusText = $"Done! Saved as {name}.mp4";
+            StatusText = $"Done! Saved as {name}{Extension}";
         }
         catch (OperationCanceledException)
         {

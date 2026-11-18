@@ -15,7 +15,7 @@ public partial class TimelineViewModel : ObservableObject
     public TimelineViewModel(Project project) => Load(project);
 
     public Project Project { get; private set; } = null!;
-    public IReadOnlyList<Track> Tracks => Project.Tracks;
+    public System.Collections.ObjectModel.ObservableCollection<Track> Tracks => Project.Tracks;
     public double Fps => Project.Fps;
 
     /// <summary>Clips were added, moved, cut... The preview needs updating and the project needs saving.</summary>
@@ -69,6 +69,37 @@ public partial class TimelineViewModel : ObservableObject
     public string DurationTimecode => Timecode.FromFrames(DurationFrames, Fps);
 
     partial void OnPlayheadFrameChanged(long value) => RedrawNeeded?.Invoke();
+
+    // ===================== Adding and removing tracks =====================
+
+    [RelayCommand]
+    private void AddVideoTrack() => AddTrack(TrackKind.Video);
+
+    [RelayCommand]
+    private void AddAudioTrack() => AddTrack(TrackKind.Audio);
+
+    private void AddTrack(TrackKind kind)
+    {
+        SaveUndoPoint();
+        Track track = Project.AddTrack(kind);
+        track.PropertyChanged += OnTrackChanged;
+        NotifyContentChanged();
+    }
+
+    /// <summary>Removes a track and its clips (after asking, if it has clips). Undo brings it back.</summary>
+    [RelayCommand]
+    private void RemoveTrack(Track? track)
+    {
+        if (track is null) return;
+        int sameKind = track.Kind == TrackKind.Video ? Project.VideoTrackCount : Project.AudioTrackCount;
+        if (sameKind <= 1) return; // always keep one video and one sound track
+        SaveUndoPoint();
+        Selection.RemoveWhere(track.Clips.Contains);
+        track.PropertyChanged -= OnTrackChanged;
+        Project.RemoveTrack(track);
+        SelectionChanged();
+        NotifyContentChanged();
+    }
 
     // ===================== Jumping between cuts =====================
 
@@ -285,19 +316,32 @@ public partial class TimelineViewModel : ObservableObject
     // ===================== Undo / redo =====================
     // Before each edit we save a copy of every track's clips. Undo puts the copy back.
 
-    private sealed record Snapshot(List<List<Clip>> Tracks, HashSet<Guid> Selected);
+    private sealed record TrackState(Track Track, List<Clip> Clips);
+    private sealed record Snapshot(List<TrackState> Tracks, HashSet<Guid> Selected);
 
     private readonly Stack<Snapshot> undoStack = new();
     private readonly Stack<Snapshot> redoStack = new();
 
     private Snapshot TakeSnapshot() => new(
-        Project.Tracks.Select(t => t.Clips.Select(c => c.Copy()).ToList()).ToList(),
+        Project.Tracks.Select(t => new TrackState(t, t.Clips.Select(c => c.Copy()).ToList())).ToList(),
         Selection.Select(c => c.Id).ToHashSet());
 
     private void RestoreSnapshot(Snapshot s)
     {
-        for (int i = 0; i < Project.Tracks.Count; i++)
-            Project.Tracks[i].Clips = s.Tracks[i].Select(c => c.Copy()).ToList();
+        // Put back the same tracks in the same order (tracks may have been added or removed).
+        if (!Project.Tracks.SequenceEqual(s.Tracks.Select(t => t.Track)))
+        {
+            foreach (var t in Project.Tracks) t.PropertyChanged -= OnTrackChanged;
+            Project.Tracks.Clear();
+            foreach (var t in s.Tracks)
+            {
+                Project.Tracks.Add(t.Track);
+                t.Track.PropertyChanged += OnTrackChanged;
+            }
+            Project.RenumberTracks();
+        }
+        foreach (var t in s.Tracks)
+            t.Track.Clips = t.Clips.Select(c => c.Copy()).ToList();
         Selection.Clear();
         Selection.UnionWith(Project.AllClips.Where(c => s.Selected.Contains(c.Id)));
         SelectionChanged();
@@ -374,9 +418,9 @@ public partial class TimelineViewModel : ObservableObject
     public void AddMedia(MediaItem media, Track track, long start)
     {
         // Pictures and video go on video tracks (titles on V2), sound on audio tracks.
-        if (media.Kind == MediaKind.Audio && track.Kind != TrackKind.Audio) track = Project.TrackByName("A1");
+        if (media.Kind == MediaKind.Audio && track.Kind != TrackKind.Audio) track = Project.FirstAudioTrack;
         if (media.Kind != MediaKind.Audio && track.Kind != TrackKind.Video)
-            track = Project.TrackByName(media.Kind == MediaKind.Text ? "V2" : "V1");
+            track = (media.Kind == MediaKind.Text ? Project.TitleTrack : Project.FirstVideoTrack);
         if (track.IsLocked) return;
 
         long length = media.Kind is MediaKind.Image or MediaKind.Text
@@ -421,7 +465,7 @@ public partial class TimelineViewModel : ObservableObject
 
     /// <summary>Adds a new title (5 seconds, on V2) at the playhead.</summary>
     [RelayCommand]
-    private void AddTitleAtPlayhead() => AddMedia(MediaItem.Title, Project.TrackByName("V2"), PlayheadFrame);
+    private void AddTitleAtPlayhead() => AddMedia(MediaItem.Title, Project.TitleTrack, PlayheadFrame);
 
     /// <summary>Removes every clip that uses this media file (when it's removed from the bin).</summary>
     public void RemoveClipsUsing(MediaItem media)

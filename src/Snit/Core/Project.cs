@@ -229,10 +229,13 @@ public sealed class TitleStyle
     public TitleStyle Copy() => (TitleStyle)MemberwiseClone();
 }
 
-/// <summary>One row on the timeline (V2, V1, A1, A2).</summary>
+/// <summary>One row on the timeline (V1, V2… for video, A1, A2… for sound).</summary>
 public partial class Track : ObservableObject
 {
-    public required string Name { get; init; }
+    /// <summary>"V1", "A2"… Tracks are renumbered when one is removed, so this can change.</summary>
+    [ObservableProperty]
+    private string name = "";
+
     public TrackKind Kind { get; init; }
     public List<Clip> Clips { get; set; } = [];
 
@@ -251,14 +254,64 @@ public sealed class Project
     public ProjectSettings Settings { get; init; } = new();
     public ObservableCollection<MediaItem> Media { get; } = [];
 
-    /// <summary>Tracks from top to bottom, as shown on screen.</summary>
-    public IReadOnlyList<Track> Tracks { get; } =
+    /// <summary>
+    /// Tracks from top to bottom, as shown on screen: video tracks (highest number on top),
+    /// then sound tracks (A1 first). New projects start with V1, V2, A1 and A2.
+    /// </summary>
+    public ObservableCollection<Track> Tracks { get; } =
     [
         new Track { Name = "V2", Kind = TrackKind.Video },
         new Track { Name = "V1", Kind = TrackKind.Video },
         new Track { Name = "A1", Kind = TrackKind.Audio },
         new Track { Name = "A2", Kind = TrackKind.Audio },
     ];
+
+    public int VideoTrackCount => Tracks.Count(t => t.Kind == TrackKind.Video);
+    public int AudioTrackCount => Tracks.Count(t => t.Kind == TrackKind.Audio);
+
+    /// <summary>Adds a video track on top (V3, V4…) or a sound track at the bottom (A3, A4…).</summary>
+    public Track AddTrack(TrackKind kind)
+    {
+        if (kind == TrackKind.Video)
+        {
+            var track = new Track { Name = $"V{VideoTrackCount + 1}", Kind = TrackKind.Video };
+            Tracks.Insert(0, track);
+            return track;
+        }
+        var audio = new Track { Name = $"A{AudioTrackCount + 1}", Kind = TrackKind.Audio };
+        Tracks.Add(audio);
+        return audio;
+    }
+
+    /// <summary>Removes a track (there is always at least one video and one sound track) and renumbers the rest.</summary>
+    public bool RemoveTrack(Track track)
+    {
+        int sameKind = track.Kind == TrackKind.Video ? VideoTrackCount : AudioTrackCount;
+        if (sameKind <= 1 || !Tracks.Remove(track)) return false;
+        RenumberTracks();
+        return true;
+    }
+
+    /// <summary>Gives the tracks their names again from their order: V1 at the bottom of the video tracks, A1 at the top of the sound tracks.</summary>
+    public void RenumberTracks()
+    {
+        var video = Tracks.Where(t => t.Kind == TrackKind.Video).ToList();
+        for (int i = 0; i < video.Count; i++) video[i].Name = $"V{video.Count - i}";
+        var audio = Tracks.Where(t => t.Kind == TrackKind.Audio).ToList();
+        for (int i = 0; i < audio.Count; i++) audio[i].Name = $"A{i + 1}";
+    }
+
+    /// <summary>The track with this name, adding tracks until it exists (used when opening projects with more tracks).</summary>
+    public Track EnsureTrack(string name)
+    {
+        if (Tracks.FirstOrDefault(t => t.Name == name) is Track existing) return existing;
+        TrackKind kind = name.StartsWith('A') ? TrackKind.Audio : TrackKind.Video;
+        int number = int.TryParse(name.AsSpan(1), out int n) ? n : 0;
+        Track added;
+        do added = AddTrack(kind);
+        while (added.Name != name && (kind == TrackKind.Video ? VideoTrackCount : AudioTrackCount) < Math.Max(number, 1) && number < 100);
+        return Tracks.FirstOrDefault(t => t.Name == name) ?? added;
+    }
 
     /// <summary>The "in" and "out" marks (I and O keys): a part of the timeline, e.g. to export only that.</summary>
     public long? InPoint { get; set; }
@@ -282,6 +335,15 @@ public sealed class Project
     public IEnumerable<Clip> LinkedGroup(Clip clip)
         => clip.LinkId is null ? [clip] : AllClips.Where(c => c.LinkId == clip.LinkId);
 
-    /// <summary>The audio track that goes with a video track (V1 → A1, V2 → A2).</summary>
-    public Track PartnerAudioTrack(Track videoTrack) => TrackByName(videoTrack.Name == "V2" ? "A2" : "A1");
+    /// <summary>The sound track that goes with a video track (V1 → A1, V2 → A2…; A1 when there is no match).</summary>
+    public Track PartnerAudioTrack(Track videoTrack)
+        => Tracks.FirstOrDefault(t => t.Kind == TrackKind.Audio && t.Name == "A" + videoTrack.Name[1..])
+           ?? Tracks.First(t => t.Kind == TrackKind.Audio);
+
+    /// <summary>The lowest video / sound track (V1 / A1), the usual place for new clips.</summary>
+    public Track FirstVideoTrack => Tracks.Last(t => t.Kind == TrackKind.Video);
+    public Track FirstAudioTrack => Tracks.First(t => t.Kind == TrackKind.Audio);
+
+    /// <summary>The second video track (V2) if there is one, for titles; otherwise V1.</summary>
+    public Track TitleTrack => Tracks.FirstOrDefault(t => t.Name == "V2") ?? FirstVideoTrack;
 }

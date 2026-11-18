@@ -90,6 +90,9 @@
                         <Separator/>
                         <MenuItem Header="Snapping" IsCheckable="True" InputGestureText="S" IsChecked="{Binding Timeline.SnappingEnabled}"/>
                         <Separator/>
+                        <MenuItem Header="Add video track" Command="{Binding Timeline.AddVideoTrackCommand}"/>
+                        <MenuItem Header="Add audio track" Command="{Binding Timeline.AddAudioTrackCommand}"/>
+                        <Separator/>
                         <MenuItem Header="Zoom in" InputGestureText="=" Command="{Binding Timeline.ZoomInCommand}"/>
                         <MenuItem Header="Zoom out" InputGestureText="-" Command="{Binding Timeline.ZoomOutCommand}"/>
                     </MenuItem>

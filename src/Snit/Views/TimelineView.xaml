@@ -18,7 +18,19 @@
         <!-- One track header: name, hide/mute toggle, lock toggle. Height matches TimelineCanvas.TrackHeight. -->
         <DataTemplate x:Key="TrackHeader" DataType="{x:Type core:Track}">
             <Border x:Name="Row" Height="56" Background="{StaticResource PanelBrush}"
-                    BorderBrush="{StaticResource RowDividerBrush}" BorderThickness="0,0,1,1" Padding="12,0,8,0">
+                    BorderBrush="{StaticResource RowDividerBrush}" BorderThickness="0,0,1,1" Padding="12,0,8,0"
+                    Tag="{Binding DataContext.Timeline, RelativeSource={RelativeSource AncestorType=UserControl}}">
+                <!-- Right-click a track header. (The menu reaches the timeline through Tag, because
+                     a context menu lives outside the window's tree.) -->
+                <Border.ContextMenu>
+                    <ContextMenu>
+                        <MenuItem Header="Add video track" Command="{Binding PlacementTarget.Tag.AddVideoTrackCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
+                        <MenuItem Header="Add audio track" Command="{Binding PlacementTarget.Tag.AddAudioTrackCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
+                        <Separator/>
+                        <MenuItem Header="Delete this track" Command="{Binding PlacementTarget.Tag.RemoveTrackCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                  CommandParameter="{Binding}"/>
+                    </ContextMenu>
+                </Border.ContextMenu>
                 <DockPanel>
                     <TextBlock Text="{Binding Name}" FontWeight="Bold" FontSize="12" VerticalAlignment="Center"
                                Foreground="{StaticResource SecondaryTextBrush}"/>
@@ -98,6 +110,10 @@
                               ToolTip="Clips snap to the playhead and to other clips' edges (S)"/>
 
                     <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" HorizontalAlignment="Right">
+                        <Button Content="+ V" Padding="8,2" FontSize="11" Margin="0,0,4,0"
+                                Command="{Binding Timeline.AddVideoTrackCommand}" ToolTip="Add a video track on top"/>
+                        <Button Content="+ A" Padding="8,2" FontSize="11" Margin="0,0,16,0"
+                                Command="{Binding Timeline.AddAudioTrackCommand}" ToolTip="Add an audio track at the bottom"/>
                         <Button Style="{StaticResource IconButton}" Content="&#xE71F;" Width="26" Height="26" FontSize="12"
                                 Command="{Binding Timeline.ZoomOutCommand}" ToolTip="Zoom out (-)"/>
                         <Slider Width="140" Margin="6,0"
@@ -130,15 +146,23 @@
                                 PlayheadBrush="{StaticResource PlayheadBrush}"
                                 ToolTip="Click or drag to move the playhead"/>
 
-            <!-- ============ Track headers ============ -->
-            <Border Grid.Row="2" Grid.Column="1" Background="{StaticResource PanelBrush}"
-                    BorderBrush="{StaticResource RowDividerBrush}" BorderThickness="0,0,1,0">
-                <ItemsControl ItemsSource="{Binding Timeline.Tracks}" ItemTemplate="{StaticResource TrackHeader}"
-                              VerticalAlignment="Top"/>
-            </Border>
-
-            <!-- ============ Tracks with clips ============ -->
-            <controls:TimelineCanvas Grid.Row="2" Grid.Column="2" Timeline="{Binding Timeline}"/>
+            <!-- ============ Track headers and tracks (scroll up/down when there are many tracks) ============ -->
+            <ScrollViewer x:Name="TrackScroller" Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="2"
+                          VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="132"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <Border Background="{StaticResource PanelBrush}"
+                            BorderBrush="{StaticResource RowDividerBrush}" BorderThickness="0,0,1,0">
+                        <ItemsControl ItemsSource="{Binding Timeline.Tracks}" ItemTemplate="{StaticResource TrackHeader}"
+                                      VerticalAlignment="Top"/>
+                    </Border>
+                    <controls:TimelineCanvas Grid.Column="1" Timeline="{Binding Timeline}"
+                                             MinHeight="{Binding ViewportHeight, ElementName=TrackScroller}"/>
+                </Grid>
+            </ScrollViewer>
 
             <!-- ============ Horizontal scroll bar ============ -->
             <ScrollBar Grid.Row="3" Grid.Column="2" Orientation="Horizontal" Margin="0,2"

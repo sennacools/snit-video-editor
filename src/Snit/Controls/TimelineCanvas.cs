@@ -45,17 +45,28 @@ public class TimelineCanvas : FrameworkElement
         var canvas = (TimelineCanvas)d;
         if (e.OldValue is TimelineViewModel old)
         {
-            old.RedrawNeeded -= canvas.InvalidateVisual;
+            old.RedrawNeeded -= canvas.Refresh;
             old.PropertyChanged -= canvas.OnTimelinePropertyChanged;
         }
         if (e.NewValue is TimelineViewModel tl)
         {
-            tl.RedrawNeeded += canvas.InvalidateVisual;
+            tl.RedrawNeeded += canvas.Refresh;
             tl.PropertyChanged += canvas.OnTimelinePropertyChanged;
             tl.ViewportWidth = canvas.ActualWidth;
         }
         canvas.InvalidateVisual();
     }
+
+    /// <summary>Redraw, and re-measure in case tracks were added or removed.</summary>
+    private void Refresh()
+    {
+        InvalidateMeasure();
+        InvalidateVisual();
+    }
+
+    /// <summary>As tall as all the tracks, plus a little room below to drop clips.</summary>
+    protected override Size MeasureOverride(Size availableSize)
+        => new(0, (Timeline?.Tracks.Count ?? 4) * TrackHeight + 40);
 
     private void OnTimelinePropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
@@ -516,6 +527,8 @@ public class TimelineCanvas : FrameworkElement
         var tl = Timeline;
         if (tl is null) return;
         // Ctrl + wheel zooms around the mouse; the wheel alone scrolls left and right.
+        if (Keyboard.Modifiers.HasFlag(ModifierKeys.Shift))
+            return; // Shift + wheel: scroll the tracks up and down
         if (Keyboard.Modifiers.HasFlag(ModifierKeys.Control))
             tl.ZoomAt(e.GetPosition(this).X, e.Delta > 0 ? 1.25 : 0.8);
         else
@@ -580,9 +593,9 @@ public class TimelineCanvas : FrameworkElement
         Point p = e.GetPosition(this);
         Track track = TrackAt(p.Y) ?? tl.Tracks[^1];
         // Put it on a track of the right kind.
-        if (media.Kind == MediaKind.Audio && track.Kind != TrackKind.Audio) track = tl.Project.TrackByName("A1");
+        if (media.Kind == MediaKind.Audio && track.Kind != TrackKind.Audio) track = tl.Project.FirstAudioTrack;
         if (media.Kind != MediaKind.Audio && track.Kind != TrackKind.Video)
-            track = tl.Project.TrackByName(media.Kind == MediaKind.Text ? "V2" : "V1");
+            track = media.Kind == MediaKind.Text ? tl.Project.TitleTrack : tl.Project.FirstVideoTrack;
 
         long length = media.Kind is MediaKind.Image or MediaKind.Text
             ? (long)Math.Round(Services.MediaImporter.DefaultImageSeconds * tl.Fps)

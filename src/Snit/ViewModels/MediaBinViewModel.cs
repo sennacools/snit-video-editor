@@ -55,8 +55,12 @@ public partial class MediaBinViewModel : ObservableObject
         OnPropertyChanged(nameof(Items));
         OnPropertyChanged(nameof(IsEmpty));
 
-        // Thumbnails aren't saved in the project file, so make them again.
-        foreach (var item in project.Media) _ = LoadThumbnailAsync(item);
+        // Thumbnails aren't saved in the project file, so make them again; proxies are found again.
+        foreach (var item in project.Media)
+        {
+            _ = LoadThumbnailAsync(item);
+            item.ProxyPath = ProxyMaker.Existing(item);
+        }
     }
 
     private void OnMediaChanged(object? sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
@@ -135,6 +139,47 @@ public partial class MediaBinViewModel : ObservableObject
     }
 
     /// <summary>Removes a file from the bin (and its clips from the timeline, after asking).</summary>
+    // ===================== Proxies =====================
+
+    /// <summary>Raised when a proxy is ready (the preview then reads from it).</summary>
+    public event Action? ProxiesChanged;
+
+    /// <summary>Right-click → Make proxy: a small copy for a smooth preview.</summary>
+    [RelayCommand]
+    private Task CreateProxyAsync(MediaItem? item)
+    {
+        item ??= SelectedItem;
+        return item is null ? Task.CompletedTask : MakeProxiesAsync([item]);
+    }
+
+    /// <summary>Clip → Make proxies for all videos.</summary>
+    [RelayCommand]
+    private Task CreateAllProxiesAsync() => MakeProxiesAsync(project.Media.ToList());
+
+    /// <summary>Makes the missing proxies one after the other (each shows "Making proxy…" on its tile).</summary>
+    public async Task MakeProxiesAsync(IReadOnlyList<MediaItem> items)
+    {
+        var todo = items.Where(m => ProxyMaker.CanHaveProxy(m) && !m.HasProxy && !m.IsMakingProxy).ToList();
+        foreach (var item in todo) item.IsMakingProxy = true;
+        var failed = new List<string>();
+        foreach (var item in todo)
+        {
+            try
+            {
+                item.ProxyPath = await ProxyMaker.CreateAsync(item);
+                ProxiesChanged?.Invoke();
+            }
+            catch (Exception ex) when (ex is IOException or InvalidOperationException)
+            {
+                failed.Add($"{item.Name}: {ex.Message}");
+            }
+            finally { item.IsMakingProxy = false; }
+        }
+        if (failed.Count > 0)
+            System.Windows.MessageBox.Show("Some proxies could not be made:\n\n" + string.Join("\n", failed), "Proxies",
+                System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Warning);
+    }
+
     [RelayCommand]
     private void Remove(MediaItem? item)
     {

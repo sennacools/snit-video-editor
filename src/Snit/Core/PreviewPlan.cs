@@ -76,12 +76,14 @@ public static class PreviewPlan
     /// One list of clips per video track, bottom track (V1) first. A hidden track gives an
     /// empty list, so the numbering of the layers never changes.
     /// </summary>
-    public static IReadOnlyList<IReadOnlyList<VideoSegment>> BuildLayers(Project project)
+    /// <param name="useProxies">Read video from the proxy files where there are some (preview only).</param>
+    public static IReadOnlyList<IReadOnlyList<VideoSegment>> BuildLayers(Project project, bool useProxies = false)
         => project.Tracks.Where(t => t.Kind != TrackKind.Audio).Reverse()
             .Select(t => (IReadOnlyList<VideoSegment>)(t.IsOff ? [] : TransitionPlan.Expand(t, project.Fps)
                 .Where(r => !r.Clip.Media.IsOffline)
                 .Select(r => new VideoSegment(
-                    r.Clip.Start, r.Clip.End, r.Clip.Media.FilePath, r.Clip.Media.Kind,
+                    r.Clip.Start, r.Clip.End,
+                    useProxies && r.Clip.Media.ProxyPath is string proxy ? proxy : r.Clip.Media.FilePath, r.Clip.Media.Kind,
                     r.Clip.In, r.Clip.SourceLength, r.Clip.Speed, r.Clip.Reverse,
                     r.Clip.Look, r.Clip.Media.Width, r.Clip.Media.Height, r.Original.Id, r.Clip.Title?.Copy(),
                     r.FadeInFrames, r.FadeOutFrames, r.BlackInFrames, r.BlackOutFrames, r.Slot, r.Clip.Keyframes, r.Clip.Effects))

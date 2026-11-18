@@ -89,9 +89,12 @@ public sealed class PlaybackEngine : IDisposable
     // ===================== Called from the window =====================
 
     /// <summary>Give the player a fresh copy of the timeline after an edit.</summary>
+    /// <summary>Use the small proxy copies of big videos for the preview (where they exist).</summary>
+    public bool UseProxies { get; set; } = true;
+
     public void UpdateTimeline(Project project)
     {
-        layers = PreviewPlan.BuildLayers(project);
+        layers = PreviewPlan.BuildLayers(project, UseProxies);
         audioPieces = PreviewPlan.BuildAudio(project);
         Interlocked.Exchange(ref durationFrames, project.DurationFrames);
         timelineChanged = true;

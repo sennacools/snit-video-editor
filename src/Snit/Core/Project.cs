@@ -54,6 +54,16 @@ public partial class MediaItem : ObservableObject
     [ObservableProperty]
     private bool isOffline;
 
+    /// <summary>A small copy for smooth previews (see ProxyMaker), or null. Not saved: found again when a project opens.</summary>
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(HasProxy))]
+    private string? proxyPath;
+
+    public bool HasProxy => ProxyPath is not null;
+
+    /// <summary>True while the proxy is being made.</summary>
+    [ObservableProperty]
+    private bool isMakingProxy;
+
     public bool IsAudioOnly => Kind == MediaKind.Audio;
 
     /// <summary>The badge text in the bin: "0:12", "1:02:03" or "Still".</summary>

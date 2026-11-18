@@ -20,6 +20,16 @@
                             <TextBlock Text="{Binding DurationText}" FontFamily="{StaticResource MonoFont}"
                                        FontSize="10" Foreground="{StaticResource TextBrush}"/>
                         </Border>
+                        <!-- "P" badge: this video has a proxy. -->
+                        <Border Background="#CC5B9BFF" CornerRadius="3" Padding="4,1" Margin="4"
+                                HorizontalAlignment="Left" VerticalAlignment="Bottom" ToolTip="Has a proxy for smooth preview"
+                                Visibility="{Binding HasProxy, Converter={StaticResource BoolToVisibility}}">
+                            <TextBlock Text="P" FontSize="10" FontWeight="Bold" Foreground="#0B1220"/>
+                        </Border>
+                        <Border Background="#B0000000" Visibility="{Binding IsMakingProxy, Converter={StaticResource BoolToVisibility}}">
+                            <TextBlock Text="Making proxy…" Foreground="White" FontSize="11"
+                                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
                         <Border x:Name="Offline" Background="#B0200000" Visibility="Collapsed">
                             <TextBlock Text="File missing" Foreground="White" FontSize="11"
                                        HorizontalAlignment="Center" VerticalAlignment="Center"/>
@@ -127,6 +137,9 @@
                             </ListBox.ItemsPanel>
                             <ListBox.ContextMenu>
                                 <ContextMenu>
+                                    <MenuItem Header="Make proxy (smooth preview)" Command="{Binding Bin.CreateProxyCommand}"/>
+                                    <MenuItem Header="Make proxies for all videos" Command="{Binding Bin.CreateAllProxiesCommand}"/>
+                                    <Separator/>
                                     <MenuItem Header="Remove from project" InputGestureText="Del"
                                               Command="{Binding Bin.RemoveCommand}"/>
                                 </ContextMenu>

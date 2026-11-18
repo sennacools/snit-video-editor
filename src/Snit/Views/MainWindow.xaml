@@ -122,6 +122,9 @@
                     <MenuItem Header="_View">
                         <MenuItem Header="Title-safe guides" IsCheckable="True"
                                   IsChecked="{Binding ShowSafeGuides}"/>
+                        <MenuItem Header="Use proxies for preview" IsCheckable="True" IsChecked="{Binding UseProxies}"
+                                  ToolTip="Big videos play from their small copies. Make them by right-clicking a video in the bin."/>
+                        <MenuItem Header="Make proxies for all videos" Command="{Binding Bin.CreateAllProxiesCommand}"/>
                     </MenuItem>
                     <MenuItem Header="_Help">
                         <MenuItem Header="Check FFmpeg" Command="{Binding ReportFfmpegStatusCommand}"/>

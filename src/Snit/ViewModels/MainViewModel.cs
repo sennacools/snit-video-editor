@@ -26,6 +26,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
         project = new Project();
         Timeline = new TimelineViewModel(project);
         Bin = new MediaBinViewModel(project, Timeline);
+        Bin.ProxiesChanged += RefreshPreviewSources;
         Inspector = new InspectorViewModel(Timeline);
         Source = new SourceMonitorViewModel(() => Timeline);
         playback = CreatePlayer(project);
@@ -146,7 +147,23 @@ public partial class MainViewModel : ObservableObject, IDisposable
     public int FrameWidth => project.Settings.Width;
     public int FrameHeight => project.Settings.Height;
 
-    public string PreviewQualityText => $"Preview quality: {playback.PreviewWidth}×{playback.PreviewHeight} · Fit";
+    public string PreviewQualityText => $"Preview quality: {playback.PreviewWidth}×{playback.PreviewHeight} · Fit"
+                                        + (UseProxies && project.Media.Any(m => m.HasProxy) ? " · Proxies" : "");
+
+    /// <summary>View → Use proxies: preview big videos from their small copies (the export always uses the originals).</summary>
+    [ObservableProperty]
+    private bool useProxies = true;
+
+    partial void OnUseProxiesChanged(bool value) => RefreshPreviewSources();
+
+    /// <summary>Proxies were made or switched on/off: read the video from the right files again.</summary>
+    private void RefreshPreviewSources()
+    {
+        playback.UseProxies = UseProxies;
+        playback.UpdateTimeline(project);
+        if (!IsPlaying) playback.Seek(Timeline.PlayheadFrame);
+        OnPropertyChanged(nameof(PreviewQualityText));
+    }
 
     /// <summary>Set by the window: takes a small picture of the monitor (for the export dialog).</summary>
     public Func<ImageSource?>? CapturePreview { get; set; }
@@ -167,7 +184,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
     private PlaybackEngine CreatePlayer(Project p)
     {
-        var engine = new PlaybackEngine(p.Settings);
+        var engine = new PlaybackEngine(p.Settings) { UseProxies = UseProxies };
         engine.PositionChanged += frame =>
         {
             positionFromPlayer = true;

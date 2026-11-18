@@ -8,7 +8,8 @@ It's built with C#, WPF and FFmpeg.
 ![Snit main window](docs/screenshot.png)
 
 > **Status:** work in progress. You can import media, edit on the timeline, preview with
-> sound, save projects and export to MP4. Titles, audio tools and effects are next.
+> sound, add titles, adjust clip volume and fades, save projects and export to MP4.
+> Picture effects (transform, colour, speed) are next.
 
 ## What works
 
@@ -17,7 +18,11 @@ It's built with C#, WPF and FFmpeg.
   trim edges, cut with the razor, delete or ripple-delete, snapping, hide/mute/lock tracks.
   Videos with sound get a linked audio clip that is edited together with the picture.
 - **Preview** with sound, frame-accurate scrubbing on the ruler, and frame-by-frame stepping
-- **Undo / redo** for every timeline edit
+- **Titles**: add with the T tool, the Text tab or "Add title at playhead"; change the text,
+  font, size, colour, bold, shadow and position in the inspector
+- **Sound**: waveforms on audio clips, per-clip volume and fade in/out in the inspector,
+  and live stereo level meters while playing
+- **Undo / redo** for every timeline edit (one slider drag or one bit of typing is one step)
 - **Projects** saved as `.snit` files (plain JSON; media files are referenced, never copied)
 - **Export** to MP4 (H.264 video, AAC 320 kbps sound) at 720p, 1080p, 4K or vertical 1080×1920,
   24–60 fps, with a quality slider, a progress bar with time left, and a Stop button.
@@ -88,6 +93,10 @@ Snit turns the timeline into a single `ffmpeg` command. Each clip becomes an inp
 used part of its file. The pictures are resized to the export size and laid over a black
 background at the right times (V2 on top of V1), and all sound clips are delayed to their
 place and mixed. `ffmpeg` reports which frame it is on, which drives the progress bar.
+
+Titles are drawn by Snit itself into see-through PNG pictures (the same drawing the preview
+shows), which `ffmpeg` lays over the video like any other picture. Clip volume and fades use
+the same `ffmpeg` sound recipe in the preview and in the export.
 
 ## Tests
 

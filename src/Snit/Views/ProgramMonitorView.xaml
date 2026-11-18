@@ -83,7 +83,7 @@
                                      IsChecked="{Binding MonitorTab, Converter={StaticResource EqualsConverter}, ConverterParameter=Program}">
                             <TextBlock>
                                 <Run Text="Program:" Foreground="{StaticResource MutedTextBrush}"/>
-                                <Run Text="Main sequence"/>
+                                <Run Text="{Binding ActiveSequence.Name, Mode=OneWay}"/>
                             </TextBlock>
                         </RadioButton>
                     </StackPanel>

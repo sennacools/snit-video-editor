@@ -88,6 +88,8 @@
                     <MenuItem Header="_Clip">
                         <MenuItem Header="Split at playhead" InputGestureText="Ctrl+K" Command="{Binding Timeline.SplitAtPlayheadCommand}"/>
                         <MenuItem Header="Cross dissolve at playhead cut" InputGestureText="Ctrl+D" Command="{Binding Timeline.AddDissolveAtPlayheadCommand}"/>
+                        <Separator/>
+                        <MenuItem Header="Nest selected clips…" Click="Nest_Click"/>
 
                     </MenuItem>
                     <MenuItem Header="_Timeline">
@@ -107,6 +109,9 @@
                         <Separator/>
                         <MenuItem Header="Snapping" IsCheckable="True" InputGestureText="S" IsChecked="{Binding Timeline.SnappingEnabled}"/>
                         <Separator/>
+                        <MenuItem Header="New sequence…" Click="NewSequence_Click"/>
+                        <MenuItem Header="Rename sequence…" Click="RenameSequence_Click"/>
+                        <MenuItem Header="Delete sequence" Click="DeleteSequence_Click"/>
                         <MenuItem Header="Sequence settings…" Click="SequenceSettings_Click"/>
                         <Separator/>
                         <MenuItem Header="Add caption at playhead" Command="{Binding Timeline.AddCaptionAtPlayheadCommand}"/>

@@ -259,4 +259,46 @@ public partial class MainWindow : Window
             MessageBox.Show(this, "Couldn't save the file: " + ex.Message, "Export captions", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
     }
+
+    // ---- Sequences ----
+
+    private string NextSequenceName(string start)
+    {
+        for (int n = 1; ; n++)
+            if (viewModel.Sequences.All(s => s.Name != $"{start} {n}")) return $"{start} {n}";
+    }
+
+    private void NewSequence_Click(object sender, RoutedEventArgs e)
+    {
+        if (TextPromptWindow.Ask(this, "Name of the new sequence", NextSequenceName("Sequence")) is { Length: > 0 } name)
+            viewModel.NewSequence(name);
+    }
+
+    private void RenameSequence_Click(object sender, RoutedEventArgs e)
+    {
+        if (TextPromptWindow.Ask(this, "New name of this sequence", viewModel.ActiveSequence.Name) is { Length: > 0 } name)
+            viewModel.RenameSequence(name);
+    }
+
+    private void DeleteSequence_Click(object sender, RoutedEventArgs e)
+    {
+        string name = viewModel.ActiveSequence.Name;
+        if (viewModel.Sequences.Count > 1 &&
+            MessageBox.Show(this, $"Delete the sequence “{name}” and everything in it? This can't be undone.", "Delete sequence",
+                MessageBoxButton.OKCancel, MessageBoxImage.Warning) != MessageBoxResult.OK)
+            return;
+        if (viewModel.DeleteSequence() is string why)
+            MessageBox.Show(this, why, "Delete sequence", MessageBoxButton.OK, MessageBoxImage.Information);
+    }
+
+    private void Nest_Click(object sender, RoutedEventArgs e)
+    {
+        if (viewModel.Timeline.Selection.Count == 0)
+        {
+            MessageBox.Show(this, "Select the clips to nest first.", "Nest", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+        if (TextPromptWindow.Ask(this, "Name of the nested sequence", NextSequenceName("Nested sequence")) is { Length: > 0 } name)
+            viewModel.NestSelection(name);
+    }
 }

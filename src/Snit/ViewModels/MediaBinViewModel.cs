@@ -185,17 +185,29 @@ public partial class MediaBinViewModel : ObservableObject
     {
         item ??= SelectedItem;
         if (item is null) return;
+        if (item.IsSequence)
+        {
+            MessageBox.Show("To delete a sequence, open it (double-click) and choose Timeline → Delete sequence.",
+                "Remove media", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
 
-        int uses = project.AllClips.Count(c => c.Media == item);
+        // Clips in every sequence count, not only the open one.
+        int uses = project.Sequences.Sum(s => s.AllClips.Count(c => c.Media == item));
         if (uses > 0)
         {
             var answer = MessageBox.Show(
-                $"\"{item.Name}\" is used {uses} time(s) on the timeline. Remove those clips too?",
+                $"\"{item.Name}\" is used {uses} time(s) in your sequences. Remove those clips too?",
                 "Remove media", MessageBoxButton.OKCancel, MessageBoxImage.Question);
             if (answer != MessageBoxResult.OK) return;
             timeline.RemoveClipsUsing(item);
+            foreach (Sequence other in project.Sequences.Where(s => s != project.ActiveSequence))
+                foreach (Track track in other.Tracks) track.Clips.RemoveAll(c => c.Media == item);
         }
         project.Media.Remove(item);
         timeline.NotifyContentChanged();
     }
+
+    /// <summary>Makes the thumbnail again (after a nested sequence was rendered).</summary>
+    public void RefreshThumbnail(MediaItem item) => _ = LoadThumbnailAsync(item);
 }

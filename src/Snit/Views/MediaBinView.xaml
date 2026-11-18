@@ -20,6 +20,13 @@
                             <TextBlock Text="{Binding DurationText}" FontFamily="{StaticResource MonoFont}"
                                        FontSize="10" Foreground="{StaticResource TextBrush}"/>
                         </Border>
+                        <!-- Sequence badge: double-click to open it, drag it into another sequence to nest it. -->
+                        <Border Background="#CCE8C547" CornerRadius="3" Padding="4,1" Margin="4"
+                                HorizontalAlignment="Left" VerticalAlignment="Top"
+                                ToolTip="A sequence: double-click to open it, or drag it into another sequence"
+                                Visibility="{Binding IsSequence, Converter={StaticResource BoolToVisibility}}">
+                            <TextBlock Text="SEQUENCE" FontSize="9" FontWeight="Bold" Foreground="#0B1220"/>
+                        </Border>
                         <!-- "P" badge: this video has a proxy. -->
                         <Border Background="#CC5B9BFF" CornerRadius="3" Padding="4,1" Margin="4"
                                 HorizontalAlignment="Left" VerticalAlignment="Bottom" ToolTip="Has a proxy for smooth preview"

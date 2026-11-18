@@ -46,8 +46,9 @@ public partial class MediaBinView : UserControl
     /// <summary>Double-click a tile: watch it in the Source monitor.</summary>
     private void MediaList_DoubleClick(object sender, MouseButtonEventArgs e)
     {
-        if (MediaList.SelectedItem is MediaItem item && DataContext is MainViewModel main)
-            main.OpenInSourceCommand.Execute(item);
+        if (MediaList.SelectedItem is not MediaItem item || DataContext is not MainViewModel main) return;
+        if (item.IsSequence) main.OpenSequenceFor(item); // a sequence opens in the timeline
+        else main.OpenInSourceCommand.Execute(item);
     }
 
     private void MediaList_KeyDown(object sender, KeyEventArgs e)

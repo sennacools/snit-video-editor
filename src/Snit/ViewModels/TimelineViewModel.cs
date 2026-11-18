@@ -475,6 +475,72 @@ public partial class TimelineViewModel : ObservableObject
         RedrawNeeded?.Invoke();
     }
 
+    // ===================== Nested sequences =====================
+
+    /// <summary>A sequence can't go inside itself (or inside a sequence that is inside it), and an empty one has nothing to show.</summary>
+    public bool CanPlace(MediaItem media)
+        => !media.IsSequence
+           || (Project.SequenceOf(media) is Sequence inner && inner.DurationFrames > 0
+               && !NestedSequences.WouldLoop(Project, Project.ActiveSequence, inner));
+
+    /// <summary>
+    /// Clip → Nest: moves the selected clips into a new sequence and puts that sequence in their
+    /// place as one clip (with its sound linked, on the matching audio track). Returns the new sequence.
+    /// </summary>
+    public Sequence? NestSelection(string name)
+    {
+        var clips = Selection.SelectMany(Project.LinkedGroup).Distinct()
+            .Where(c => !IsLocked(c)).ToList();
+        if (clips.Count == 0) return null;
+
+        SaveUndoPoint();
+        long start = clips.Min(c => c.Start), end = clips.Max(c => c.End);
+        var placement = clips.Select(c => (Clip: c, Track: Project.TrackOf(c))).ToList();
+
+        var inner = new Sequence
+        {
+            Name = name,
+            Settings = new ProjectSettings { Width = Project.Settings.Width, Height = Project.Settings.Height, FrameRate = Project.Settings.FrameRate },
+        };
+        Project.Sequences.Add(inner);
+        Project.With(inner, () =>
+        {
+            foreach (var (clip, track) in placement)
+            {
+                Track target = track.Kind == TrackKind.Caption ? Captions.EnsureTrack(Project) : Project.EnsureTrack(track.Name);
+                Clip copy = clip.Copy();
+                copy.Start -= start;
+                target.Clips.Add(copy);
+            }
+            return true;
+        });
+        foreach (var (clip, track) in placement) track.Clips.Remove(clip);
+
+        MediaItem item = NestedSequences.EnsureMediaItem(Project, inner);
+        var pictureTracks = placement.Where(p => p.Track.Kind != TrackKind.Audio).Select(p => p.Track).ToList();
+        var soundTracks = placement.Where(p => p.Track.Kind == TrackKind.Audio).Select(p => p.Track).ToList();
+        Track? videoTrack = pictureTracks.Count > 0
+            ? pictureTracks.Where(t => t.Kind == TrackKind.Video).OrderByDescending(Project.Tracks.IndexOf).FirstOrDefault() ?? Project.FirstVideoTrack
+            : null;
+        Track? audioTrack = soundTracks.Count > 0
+            ? (videoTrack is not null ? Project.PartnerAudioTrack(videoTrack) : soundTracks.OrderBy(Project.Tracks.IndexOf).First())
+            : null;
+        Guid? link = videoTrack is not null && audioTrack is not null ? Guid.NewGuid() : null;
+
+        Selection.Clear();
+        foreach (Track? track in new[] { videoTrack, audioTrack })
+        {
+            if (track is null) continue;
+            var nested = new Clip { Media = item, Start = start, Length = end - start, LinkId = link };
+            TimelineEdits.ClearRange(track, nested.Start, nested.End, []);
+            track.Clips.Add(nested);
+            Selection.Add(nested);
+        }
+        SelectionChanged();
+        NotifyContentChanged();
+        return inner;
+    }
+
     // ===================== Adding clips =====================
 
     /// <summary>
@@ -509,6 +575,7 @@ public partial class TimelineViewModel : ObservableObject
         if (media.Kind != MediaKind.Audio && track.Kind != TrackKind.Video)
             track = (media.Kind == MediaKind.Text ? Project.TitleTrack : Project.FirstVideoTrack);
         if (track.IsLocked || length <= 0) return;
+        if (!CanPlace(media)) return;
 
         SaveUndoPoint();
 

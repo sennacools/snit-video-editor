@@ -21,7 +21,7 @@ public static class ProxyMaker
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Snit", "Proxies");
 
     /// <summary>Only video files get proxies.</summary>
-    public static bool CanHaveProxy(MediaItem item) => item.Kind == MediaKind.Video && !item.IsOffline;
+    public static bool CanHaveProxy(MediaItem item) => item.Kind == MediaKind.Video && !item.IsOffline && !item.IsSequence;
 
     /// <summary>Where the proxy of a file is (or would be).</summary>
     public static string PathFor(string file)

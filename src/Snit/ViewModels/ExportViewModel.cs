@@ -285,7 +285,17 @@ public partial class ExportViewModel : ObservableObject
         };
 
         ExportPlan plan;
-        try { plan = ExportCommandBuilder.Build(project, settings); }
+        try
+        {
+            if (project.AllClips.Any(c => c.Media.IsSequence))
+            {
+                IsExporting = true;
+                StatusText = "Preparing nested sequences…";
+                try { await NestedSequences.EnsureRenderedAsync(project, project.ActiveSequence, new Progress<string>(t => StatusText = t)); }
+                finally { IsExporting = false; StatusText = ""; }
+            }
+            plan = ExportCommandBuilder.Build(project, settings);
+        }
         catch (Exception ex) { ShowError(ex.Message); return; }
 
         IsExporting = true;

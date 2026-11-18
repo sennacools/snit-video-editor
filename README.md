@@ -42,6 +42,18 @@ It's built with C#, WPF and FFmpeg.
 - **Audio workspace**: a track mixer on the left (volume fader, balance, mute and solo per sound
   track) and the clip's sound on the right: volume with keyframes, fades, a three-band
   equaliser (bass, voice, treble) and noise reduction
+- **Title templates** in the Text tab (title, big title, lower third, chapter, corner tag, caption,
+  end credits): drag one onto a video track or double-click it; titles can have a box behind the text
+- **Captions**: a C1 track at the top where each clip is one subtitle (Timeline → Add caption at
+  playhead). Import and export `.srt` files; the export can burn them into the picture and/or save an `.srt` next to it
+- **Sequences**: several timelines in one project (Timeline → New / Rename / Delete sequence, and the
+  dropdown above the timeline). **Sequence settings** choose the size (HD, 4K, vertical, square…) and frame rate;
+  clips keep their place in time
+- **Nested sequences**: select clips and choose Clip → Nest, or drag a sequence from the bin into another one.
+  Snit renders a nested sequence to a hidden high-quality file and plays that; when you change it, it is
+  rendered again automatically (always before an export)
+- **Proxies** for smooth 4K: right-click a video in the bin → Make proxy. The preview plays the small copy
+  (View → Use proxies), the export always uses the original
 - **In and out marks** (I and O) to export just a part of the timeline
 - **Undo / redo** for every timeline edit (one slider drag or one bit of typing is one step)
 - **Projects** saved as `.snit` files (plain JSON; media files are referenced, never copied),

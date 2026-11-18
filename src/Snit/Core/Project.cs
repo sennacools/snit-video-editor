@@ -27,15 +27,27 @@ public partial class MediaItem : ObservableObject
 {
     public Guid Id { get; init; } = Guid.NewGuid();
     public required string FilePath { get; set; }
-    public string Name => Path.GetFileName(FilePath);
+    public string Name => DisplayName ?? Path.GetFileName(FilePath);
+
+    /// <summary>A name to show instead of the file name (a sequence's name).</summary>
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(Name))]
+    private string? displayName;
     public MediaKind Kind { get; init; }
 
     /// <summary>Length of the file in seconds (0 for pictures).</summary>
-    public double DurationSeconds { get; init; }
-    public int Width { get; init; }
-    public int Height { get; init; }
-    public double FrameRate { get; init; }
+    public double DurationSeconds { get; set; }
+    public int Width { get; set; }
+    public int Height { get; set; }
+    public double FrameRate { get; set; }
     public bool HasAudio { get; init; }
+
+    /// <summary>
+    /// For a sequence in the bin (a "nested" sequence): which sequence. Its <see cref="FilePath"/>
+    /// is then a rendered copy of that sequence (see NestedSequences), made again when it changes.
+    /// </summary>
+    public Guid? SequenceId { get; init; }
+
+    public bool IsSequence => SequenceId is not null;
 
     /// <summary>Small preview picture for the bin and the timeline (not saved in the project file).</summary>
     [ObservableProperty]
@@ -72,6 +84,7 @@ public partial class MediaItem : ObservableObject
         get
         {
             if (Kind == MediaKind.Image) return "Still";
+            if (IsSequence && DurationSeconds <= 0) return "Empty";
             var t = TimeSpan.FromSeconds(DurationSeconds);
             return t.TotalHours >= 1 ? t.ToString(@"h\:mm\:ss") : t.ToString(@"m\:ss");
         }
@@ -338,15 +351,22 @@ public partial class Track : ObservableObject
 /// <summary>A marker on the timeline (M key): a remembered moment with a name.</summary>
 public sealed record Marker(long Frame, string Name, string Color = "#E8C547");
 
-/// <summary>Everything in one .snit file.</summary>
-public sealed class Project
+/// <summary>
+/// A sequence: one timeline with its own tracks, size, frame rate, markers and in/out marks.
+/// A project can have several; one is open in the timeline at a time.
+/// </summary>
+public sealed partial class Sequence : ObservableObject
 {
-    public ProjectSettings Settings { get; init; } = new();
-    public ObservableCollection<MediaItem> Media { get; } = [];
+    public Guid Id { get; init; } = Guid.NewGuid();
+
+    [ObservableProperty]
+    private string name = "Main sequence";
+
+    public ProjectSettings Settings { get; set; } = new();
 
     /// <summary>
     /// Tracks from top to bottom, as shown on screen: video tracks (highest number on top),
-    /// then sound tracks (A1 first). New projects start with V1, V2, A1 and A2.
+    /// then sound tracks (A1 first). New sequences start with V1, V2, A1 and A2.
     /// </summary>
     public ObservableCollection<Track> Tracks { get; } =
     [
@@ -355,6 +375,46 @@ public sealed class Project
         new Track { Name = "A1", Kind = TrackKind.Audio },
         new Track { Name = "A2", Kind = TrackKind.Audio },
     ];
+
+    public long? InPoint { get; set; }
+    public long? OutPoint { get; set; }
+    public List<Marker> Markers { get; set; } = [];
+
+    public IEnumerable<Clip> AllClips => Tracks.SelectMany(t => t.Clips);
+    public long DurationFrames => AllClips.Select(c => c.End).DefaultIfEmpty(0).Max();
+
+    public override string ToString() => Name;
+}
+
+/// <summary>
+/// Everything in one .snit file: the media bin and the sequences. Most properties here
+/// (Settings, Tracks, markers, in/out) are those of the sequence that is open in the timeline.
+/// </summary>
+public sealed class Project
+{
+    public Project() => activeSequence = Sequences[0];
+
+    public ObservableCollection<Sequence> Sequences { get; } = [new Sequence()];
+
+    private Sequence activeSequence;
+
+    /// <summary>The sequence shown in the timeline.</summary>
+    public Sequence ActiveSequence
+    {
+        get => activeSequence;
+        set => activeSequence = Sequences.Contains(value) ? value : throw new ArgumentException("That sequence is not in this project.");
+    }
+
+    public ProjectSettings Settings { get => activeSequence.Settings; init => activeSequence.Settings = value; }
+    public ObservableCollection<MediaItem> Media { get; } = [];
+
+    /// <summary>The tracks of the open sequence (see <see cref="Sequence.Tracks"/>).</summary>
+    public ObservableCollection<Track> Tracks => activeSequence.Tracks;
+
+    /// <summary>The bin item that stands for a sequence (to put it in another sequence), or null.</summary>
+    public MediaItem? MediaFor(Sequence sequence) => Media.FirstOrDefault(m => m.SequenceId == sequence.Id);
+
+    public Sequence? SequenceOf(MediaItem item) => Sequences.FirstOrDefault(s => s.Id == item.SequenceId);
 
     /// <summary>Whether a sound track is heard: not muted, and solo when any track is solo.</summary>
     public bool IsAudible(Track track)
@@ -413,11 +473,20 @@ public sealed class Project
     }
 
     /// <summary>The "in" and "out" marks (I and O keys): a part of the timeline, e.g. to export only that.</summary>
-    public long? InPoint { get; set; }
-    public long? OutPoint { get; set; }
+    public long? InPoint { get => activeSequence.InPoint; set => activeSequence.InPoint = value; }
+    public long? OutPoint { get => activeSequence.OutPoint; set => activeSequence.OutPoint = value; }
 
     /// <summary>Markers on the timeline, in time order.</summary>
-    public List<Marker> Markers { get; set; } = [];
+    public List<Marker> Markers { get => activeSequence.Markers; set => activeSequence.Markers = value; }
+
+    /// <summary>Runs something with another sequence open for a moment (e.g. to build its export).</summary>
+    public T With<T>(Sequence sequence, Func<T> work)
+    {
+        Sequence before = activeSequence;
+        ActiveSequence = sequence;
+        try { return work(); }
+        finally { activeSequence = before; }
+    }
 
     /// <summary>Where the project is saved, or null if it never was.</summary>
     public string? FilePath { get; set; }

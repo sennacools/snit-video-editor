@@ -231,6 +231,8 @@ public partial class MainViewModel : ObservableObject, IDisposable
     private void OnTimelineContentChanged()
     {
         IsDirty = true;
+        // A sequence that was just dropped in (or nested) is shown once it has been rendered.
+        if (project.AllClips.Any(c => c.Media.IsSequence && c.Media.IsOffline)) _ = RefreshNestedAsync();
         ExportCommand.NotifyCanExecuteChanged(); // Export is only possible with something on the timeline
         playback.UpdateTimeline(project);
         if (!IsPlaying) playback.Seek(Timeline.PlayheadFrame);
@@ -381,7 +383,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
             SwitchTo(loaded);
             if (openPath != path) IsDirty = true; // recovered changes are not in the project file yet
 
-            var missing = loaded.Media.Where(m => m.IsOffline).Select(m => m.FilePath).ToList();
+            var missing = loaded.Media.Where(m => m.IsOffline && !m.IsSequence).Select(m => m.FilePath).ToList(); // sequences are rendered by Snit itself
             if (missing.Count > 0)
                 MessageBox.Show("Some media files can't be found (moved or deleted?):\n\n" + string.Join("\n", missing),
                     "Missing media", MessageBoxButton.OK, MessageBoxImage.Warning);
@@ -471,22 +473,142 @@ public partial class MainViewModel : ObservableObject, IDisposable
     {
         if (IsPlaying) PlayPause();
         project = newProject;
-        Timeline.Load(project);
         Bin.Load(project);
+        ReloadSequence();
+        IsDirty = dirty;
+        OnPropertyChanged(nameof(Sequences));
+        OnPropertyChanged(nameof(ProjectName));
+        OnPropertyChanged(nameof(WindowTitle));
+        _ = RefreshNestedAsync();
+    }
 
-        // A new project may have a different size, so the preview starts fresh.
+    /// <summary>Shows the open sequence: the timeline, and a fresh player (its size may differ).</summary>
+    private void ReloadSequence()
+    {
+        Timeline.Load(project);
         playback.Dispose();
         playback = CreatePlayer(project);
-
-        IsDirty = dirty;
         ExportCommand.NotifyCanExecuteChanged();
         titlePictures.Clear();
         OnPropertyChanged(nameof(FrameWidth));
         OnPropertyChanged(nameof(FrameHeight));
         OnPropertyChanged(nameof(PreviewQualityText));
-        OnPropertyChanged(nameof(ProjectName));
         OnPropertyChanged(nameof(ProjectInfo));
-        OnPropertyChanged(nameof(WindowTitle));
+        OnPropertyChanged(nameof(ActiveSequence));
+    }
+
+    // ===================== Sequences =====================
+
+    /// <summary>The project's sequences (the dropdown above the timeline).</summary>
+    public System.Collections.ObjectModel.ObservableCollection<Sequence> Sequences => project.Sequences;
+
+    /// <summary>The sequence in the timeline. Choosing another one in the dropdown opens it.</summary>
+    public Sequence ActiveSequence
+    {
+        get => project.ActiveSequence;
+        set { if (value is not null) OpenSequence(value); }
+    }
+
+    /// <summary>Work going on in the background, e.g. "Rendering “Intro”…" (shown above the timeline).</summary>
+    [ObservableProperty]
+    private string backgroundStatus = "";
+
+    /// <summary>Opens another sequence in the timeline (its undo history starts fresh).</summary>
+    public void OpenSequence(Sequence sequence)
+    {
+        if (sequence == project.ActiveSequence || !project.Sequences.Contains(sequence)) return;
+        if (IsPlaying) PlayPause();
+        // The sequence we leave may be used elsewhere: its bin item gets its new length.
+        if (project.MediaFor(project.ActiveSequence) is not null) NestedSequences.EnsureMediaItem(project, project.ActiveSequence);
+        project.ActiveSequence = sequence;
+        ReloadSequence();
+        _ = RefreshNestedAsync();
+    }
+
+    /// <summary>Double-click a sequence in the bin.</summary>
+    public void OpenSequenceFor(MediaItem item)
+    {
+        if (project.SequenceOf(item) is Sequence sequence) OpenSequence(sequence);
+    }
+
+    /// <summary>Timeline → New sequence: an empty sequence with the same size and frame rate.</summary>
+    public void NewSequence(string name)
+    {
+        // Every sequence gets a bin item, so it can be dragged into another one.
+        foreach (Sequence s in project.Sequences) NestedSequences.EnsureMediaItem(project, s);
+        var sequence = new Sequence
+        {
+            Name = name,
+            Settings = new ProjectSettings { Width = project.Settings.Width, Height = project.Settings.Height, FrameRate = project.Settings.FrameRate },
+        };
+        project.Sequences.Add(sequence);
+        NestedSequences.EnsureMediaItem(project, sequence);
+        IsDirty = true;
+        OpenSequence(sequence);
+    }
+
+    public void RenameSequence(string name)
+    {
+        project.ActiveSequence.Name = name;
+        if (project.MediaFor(project.ActiveSequence) is MediaItem item) item.DisplayName = name;
+        IsDirty = true;
+    }
+
+    /// <summary>Timeline → Delete sequence. Returns why it can't be deleted, or null when it was.</summary>
+    public string? DeleteSequence()
+    {
+        Sequence sequence = project.ActiveSequence;
+        if (project.Sequences.Count == 1) return "A project needs at least one sequence.";
+        if (NestedSequences.IsUsed(project, sequence))
+            return $"“{sequence.Name}” is used inside another sequence. Remove it from there first.";
+
+        if (IsPlaying) PlayPause();
+        int index = project.Sequences.IndexOf(sequence);
+        project.ActiveSequence = project.Sequences[index == 0 ? 1 : index - 1];
+        project.Sequences.Remove(sequence);
+        if (project.MediaFor(sequence) is MediaItem item) project.Media.Remove(item);
+        IsDirty = true;
+        ReloadSequence();
+        _ = RefreshNestedAsync();
+        return null;
+    }
+
+    /// <summary>Clip → Nest: the selected clips become one clip that holds a new sequence.</summary>
+    public bool NestSelection(string name)
+    {
+        if (Timeline.NestSelection(name) is null) return false;
+        _ = RefreshNestedAsync();
+        return true;
+    }
+
+    private bool refreshingNested, refreshNestedAgain;
+
+    /// <summary>Renders nested sequences that changed (in the background), then shows the new renders.</summary>
+    private async Task RefreshNestedAsync()
+    {
+        if (refreshingNested) { refreshNestedAgain = true; return; }
+        refreshingNested = true;
+        Project working = project;
+        try
+        {
+            do
+            {
+                refreshNestedAgain = false;
+                var status = new Progress<string>(text => BackgroundStatus = text);
+                int rendered = await NestedSequences.EnsureRenderedAsync(working, working.ActiveSequence, status);
+                if (working != project) return;
+                if (rendered > 0)
+                    foreach (MediaItem item in project.Media.Where(m => m.IsSequence && !m.IsOffline)) Bin.RefreshThumbnail(item);
+                RefreshPreviewSources();
+            }
+            while (refreshNestedAgain);
+            BackgroundStatus = "";
+        }
+        catch (Exception ex) when (ex is ExportFailedException or IOException or InvalidOperationException)
+        {
+            BackgroundStatus = "A nested sequence couldn't be rendered: " + ex.Message;
+        }
+        finally { refreshingNested = false; }
     }
 
     // ===================== Export =====================
@@ -521,6 +643,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
                 Height = project.Settings.Height,
                 FrameRate = project.Fps,
             };
+            await NestedSequences.EnsureRenderedAsync(project, project.ActiveSequence);
             await new Exporter().RunAsync(ExportCommandBuilder.Build(project, settings), null, CancellationToken.None);
             return true;
         }

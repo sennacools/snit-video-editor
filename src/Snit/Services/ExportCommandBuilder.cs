@@ -276,16 +276,28 @@ public static class ExportCommandBuilder
 
         var chain = new List<string>();
 
+        // Only during the transition frames (the rest of the clip is left alone, which is faster).
+        var windows = new List<string>();
+        if (rc.Enter is not null) windows.Add($"lt(t,{ProcessRunner.Num(rc.EnterFrames / projectFps)})");
+        if (rc.Leave is not null) windows.Add($"gte(t,{ProcessRunner.Num((clip.Length - rc.LeaveFrames) / projectFps)})");
+        string during = string.Join("+", windows);
+
         // Zoom: zoompan keeps the picture size fixed while zooming into the middle.
         var zooms = parts.Where(x => x.Parts.Zoom != "1").Select(x => Put(x.Parts.Zoom, P($"(in/{exportFps})"), Q($"(in/{exportFps})"))).ToList();
         if (zooms.Count > 0)
             chain.Add($"zoompan=z='{string.Join("*", zooms)}':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=1:s={fw}x{fh}:fps={exportFps}");
 
-        // Squeeze (flip over): narrower every frame, on a fixed see-through canvas.
-        var squeezes = parts.Where(x => x.Parts.Squeeze != "1").Select(x => Put(x.Parts.Squeeze, P("t"), Q("t"))).ToList();
+        // Squeeze (flip over): the picture gets narrower around its middle. Done by moving pixels
+        // (the picture keeps its size, which every FFmpeg version is happy with); outside the
+        // narrowed picture it is see-through.
+        var squeezes = parts.Where(x => x.Parts.Squeeze != "1").Select(x => Put(x.Parts.Squeeze, P("T"), Q("T"))).ToList();
         if (squeezes.Count > 0)
-            chain.Add($"format=rgba,scale=w='max(2,trunc(iw*({string.Join("*", squeezes)})/2)*2)':h=ih:eval=frame," +
-                      $"pad=w={fw + 4}:h=ih:x=(ow-iw)/2:y=0:color=black@0");
+        {
+            string k = $"st(1,max(0.001,{string.Join("*", squeezes)}));st(2,W/2+(X-W/2)/ld(1));";
+            string inside = "lt(abs(X-W/2),ld(1)*W/2)";
+            string Plane(string p) => $"'{k}{p}(clip(ld(2),0,W-1),Y)'";
+            chain.Add($"format=gbrap,geq=r={Plane("r")}:g={Plane("g")}:b={Plane("b")}:a='{k}if({inside},alpha(clip(ld(2),0,W-1),Y),0)':enable='{during}'");
+        }
 
         // Opacity and wipe masks, only during the transition frames.
         var alpha = new List<string>();
@@ -296,11 +308,8 @@ public static class ExportCommandBuilder
         }
         if (alpha.Count > 0)
         {
-            var during = new List<string>();
-            if (rc.Enter is not null) during.Add($"lt(t,{ProcessRunner.Num(rc.EnterFrames / projectFps)})");
-            if (rc.Leave is not null) during.Add($"gte(t,{ProcessRunner.Num((clip.Length - rc.LeaveFrames) / projectFps)})");
             chain.Add($"format=rgba,geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':a='alpha(X,Y)*clip({string.Join("*", alpha)},0,1)'" +
-                      $":enable='{string.Join("+", during)}'");
+                      $":enable='{during}'");
         }
 
         // Movement (slide, push): in the overlay, with the timeline time t.

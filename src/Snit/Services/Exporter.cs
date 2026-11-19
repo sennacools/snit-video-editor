@@ -55,6 +55,7 @@ public sealed class Exporter
 
         // Keep ffmpeg's last messages, to explain what went wrong if it fails.
         var errorLines = new Queue<string>();
+        var problemLines = new List<string>(); // lines that say what went wrong (kept even when much more follows)
         Task readErrors = Task.Run(async () =>
         {
             while (await process.StandardError.ReadLineAsync() is string line)
@@ -62,6 +63,9 @@ public sealed class Exporter
                 {
                     errorLines.Enqueue(line);
                     if (errorLines.Count > 15) errorLines.Dequeue();
+                    if (problemLines.Count < 10 && System.Text.RegularExpressions.Regex.IsMatch(line,
+                            "error|invalid|failed|cannot|could not|no such", System.Text.RegularExpressions.RegexOptions.IgnoreCase))
+                        problemLines.Add(line);
                 }
         });
 
@@ -97,7 +101,7 @@ public sealed class Exporter
         {
             TryDelete(output);
             string details;
-            lock (errorLines) details = string.Join("\n", errorLines);
+            lock (errorLines) details = string.Join("\n", problemLines.Concat(errorLines.Where(l => !problemLines.Contains(l))).Take(15));
             throw new ExportFailedException(string.IsNullOrWhiteSpace(details) ? $"FFmpeg stopped with code {process.ExitCode}." : details);
         }
 

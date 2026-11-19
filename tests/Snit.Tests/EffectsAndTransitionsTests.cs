@@ -231,6 +231,23 @@ public class EffectsAndTransitionsTests(TestMedia media) : IClassFixture<TestMed
     }
 
     [Fact]
+    public async Task Flip_over_squeezes_the_old_clip_towards_its_middle()
+    {
+        if (!media.Available) return;
+        MediaItem red = await MediaImporter.ProbeAsync(media.Red);
+        MediaItem white = await MediaImporter.ProbeAsync(media.White);
+        string file = await Export((p, tl) =>
+        {
+            Track v1 = p.TrackByName("V1");
+            v1.Clips.Add(new Clip { Media = red, Start = 0, Length = 30 });
+            v1.Clips.Add(new Clip { Media = white, Start = 30, Length = 30, TransitionIn = new Transition(TransitionKind.FlipOver, 30) });
+        }, "flip-squeeze");
+        byte[] f = await Frame(file, 20); // the old clip is about 60% of its width
+        Assert.True(Px(f, 48, 27).R > 180 && Px(f, 48, 27).G < 60, $"The middle should still be red, got {Px(f, 48, 27)}.");
+        Assert.True(Px(f, 3, 27).R < 60, $"The edge should be black (nothing there), got {Px(f, 3, 27)}.");
+    }
+
+    [Fact]
     public async Task Dip_to_white_goes_through_white()
     {
         if (!media.Available) return;

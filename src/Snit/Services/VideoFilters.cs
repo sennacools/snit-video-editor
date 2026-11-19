@@ -170,12 +170,13 @@ public static class VideoFilters
     /// Fades at the start and end of a clip, for transitions. With alpha: from/to see-through
     /// (cross-dissolve); without: from/to black (dip to black). Times are within the clip.
     /// </summary>
-    public static string Fade(long inFrames, long outFrames, long clipFrames, double fps, bool alpha)
+    /// <param name="whiteIn">Fade in from white instead of black (dip to white).</param>
+    public static string Fade(long inFrames, long outFrames, long clipFrames, double fps, bool alpha, bool whiteIn = false, bool whiteOut = false)
     {
         string a = alpha ? ":alpha=1" : "";
         string result = "";
-        if (inFrames > 0) result += $",fade=t=in:st=0:d={N(inFrames / fps)}{a}";
-        if (outFrames > 0) result += $",fade=t=out:st={N((clipFrames - outFrames) / fps)}:d={N(outFrames / fps)}{a}";
+        if (inFrames > 0) result += $",fade=t=in:st=0:d={N(inFrames / fps)}{a}{(whiteIn && !alpha ? ":color=white" : "")}";
+        if (outFrames > 0) result += $",fade=t=out:st={N((clipFrames - outFrames) / fps)}:d={N(outFrames / fps)}{a}{(whiteOut && !alpha ? ":color=white" : "")}";
         return result;
     }
 

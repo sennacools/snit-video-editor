@@ -284,7 +284,7 @@ public class TimelineCanvas : FrameworkElement
             var rect = new Rect(x1, top + ClipInset, Math.Max(4, x2 - x1), TrackHeight - ClipInset * 2);
             dc.DrawRoundedRectangle(new SolidColorBrush(Color.FromArgb(90, 0, 0, 0)), null, rect, 4, 4);
             dc.DrawRoundedRectangle(TransitionPattern, new Pen(Brushes.White, 1), rect, 4, 4);
-            string label = t.Kind == TransitionKind.CrossDissolve ? "Dissolve" : "Dip";
+            string label = TransitionCatalog.Find(t.Kind).Name;
             var text = Text(label, Brushes.White, 10, dpi, FontWeights.SemiBold);
             if (text.Width + 8 < rect.Width)
                 dc.DrawText(text, new Point(rect.Left + (rect.Width - text.Width) / 2, rect.Bottom - text.Height - 4));

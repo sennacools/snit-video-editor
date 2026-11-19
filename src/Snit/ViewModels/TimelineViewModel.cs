@@ -965,7 +965,7 @@ public partial class TimelineViewModel : ObservableObject
     /// (kind = null). At a cut, a transition on the end of the first clip is stored on the start
     /// of the next clip instead, so a cut only ever has one transition.
     /// </summary>
-    public void SetTransition(Clip clip, bool atStart, TransitionKind? kind, long frames, bool saveUndo = true)
+    public void SetTransition(Clip clip, bool atStart, TransitionKind? kind, long frames, bool saveUndo = true, int direction = 0)
     {
         if (IsLocked(clip)) return;
         if (!atStart && NextClipAtCut(clip) is Clip next)
@@ -975,7 +975,7 @@ public partial class TimelineViewModel : ObservableObject
         }
 
         if (saveUndo) SaveUndoPoint();
-        Transition? transition = kind is TransitionKind k ? new Transition(k, Math.Clamp(frames, 1, clip.Length)) : null;
+        Transition? transition = kind is TransitionKind k ? new Transition(k, Math.Clamp(frames, 1, clip.Length), Math.Clamp(direction, 0, 3)) : null;
         foreach (Clip c in Project.LinkedGroup(clip).Where(c => !IsLocked(c)))
         {
             if (atStart) c.TransitionIn = transition;

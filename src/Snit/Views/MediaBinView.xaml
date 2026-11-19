@@ -226,10 +226,22 @@
                             </Style.Triggers>
                         </Style>
                     </DockPanel.Style>
+                    <TextBox DockPanel.Dock="Top" Text="{Binding Bin.EffectSearch, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,8"
+                             Tag="Search effects" ToolTip="Search by name, e.g. blur, key, wipe"/>
                     <TextBlock DockPanel.Dock="Bottom" Style="{StaticResource MutedText}" TextWrapping="Wrap" Margin="0,10,0,10"
                                Text="Drag an effect onto a clip on a video track, or double-click it to add it to the selected clip. Change or remove it in the inspector."/>
                     <ScrollViewer VerticalScrollBarVisibility="Auto">
-                        <ItemsControl ItemsSource="{x:Static core:EffectCatalog.All}">
+                        <ItemsControl ItemsSource="{Binding Bin.Effects}">
+                            <ItemsControl.GroupStyle>
+                                <GroupStyle>
+                                    <GroupStyle.HeaderTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Text="{Binding Name}" FontSize="11" FontWeight="SemiBold" Margin="2,10,0,6"
+                                                       Foreground="{StaticResource MutedTextBrush}"/>
+                                        </DataTemplate>
+                                    </GroupStyle.HeaderTemplate>
+                                </GroupStyle>
+                            </ItemsControl.GroupStyle>
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
                                     <Border Tag="{Binding Kind}" Margin="0,0,0,6" Padding="10,8" CornerRadius="5" Cursor="Hand"
@@ -260,45 +272,44 @@
                         </Style>
                     </StackPanel.Style>
 
-                    <UniformGrid Columns="2">
-                        <!-- Tag says which transition the tile drags. -->
-                        <Border Tag="CrossDissolve" Margin="0,0,5,0" Cursor="Hand" Background="Transparent"
-                                ToolTip="Drag onto the start or end of a clip, or onto a cut between two clips"
-                                PreviewMouseLeftButtonDown="TransitionTile_MouseDown" PreviewMouseMove="TransitionTile_MouseMove">
-                            <StackPanel>
-                                <Border CornerRadius="5" Height="70" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1">
-                                    <Border.Background>
-                                        <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
-                                            <GradientStop Color="#3B5BA9" Offset="0.15"/>
-                                            <GradientStop Color="#7A4FB5" Offset="0.85"/>
-                                        </LinearGradientBrush>
-                                    </Border.Background>
-                                </Border>
-                                <TextBlock Text="Cross dissolve" Margin="1,5,1,0" FontSize="11" Foreground="{StaticResource SecondaryTextBrush}"/>
-                            </StackPanel>
-                        </Border>
-                        <Border Tag="DipToBlack" Margin="5,0,0,0" Cursor="Hand" Background="Transparent"
-                                ToolTip="Drag onto the start or end of a clip, or onto a cut between two clips"
-                                PreviewMouseLeftButtonDown="TransitionTile_MouseDown" PreviewMouseMove="TransitionTile_MouseMove">
-                            <StackPanel>
-                                <Border CornerRadius="5" Height="70" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1">
-                                    <Border.Background>
-                                        <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
-                                            <GradientStop Color="#3B5BA9" Offset="0.05"/>
-                                            <GradientStop Color="#000000" Offset="0.5"/>
-                                            <GradientStop Color="#7A4FB5" Offset="0.95"/>
-                                        </LinearGradientBrush>
-                                    </Border.Background>
-                                </Border>
-                                <TextBlock Text="Dip to black" Margin="1,5,1,0" FontSize="11" Foreground="{StaticResource SecondaryTextBrush}"/>
-                            </StackPanel>
-                        </Border>
-                    </UniformGrid>
+                    <TextBox Text="{Binding Bin.EffectSearch, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,8"
+                             Tag="Search transitions" ToolTip="Search by name, e.g. wipe, iris, slide"/>
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" MaxHeight="460">
+                        <ItemsControl ItemsSource="{Binding Bin.TransitionGroups}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <StackPanel>
+                                        <TextBlock Text="{Binding Name}" FontSize="11" FontWeight="SemiBold" Margin="2,10,0,6"
+                                                   Foreground="{StaticResource MutedTextBrush}"/>
+                                        <ItemsControl ItemsSource="{Binding Items}">
+                                            <ItemsControl.ItemsPanel>
+                                                <ItemsPanelTemplate>
+                                                    <WrapPanel/>
+                                                </ItemsPanelTemplate>
+                                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <!-- Tag says which transition the tile drags. -->
+                                    <Border Tag="{Binding Kind}" Width="108" Margin="0,0,6,6" Padding="8,6" CornerRadius="5" Cursor="Hand"
+                                            Background="{StaticResource ControlBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1"
+                                            ToolTip="{Binding Description}"
+                                            PreviewMouseLeftButtonDown="TransitionTile_MouseDown" PreviewMouseMove="TransitionTile_MouseMove">
+                                        <TextBlock Text="{Binding Name}" FontSize="11" FontWeight="SemiBold" TextWrapping="Wrap"
+                                                   Foreground="{StaticResource TextBrush}"/>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
 
                     <Button Content="Cross dissolve at playhead cut" HorizontalAlignment="Left" Margin="0,14,0,0"
                             Command="{Binding Timeline.AddDissolveAtPlayheadCommand}" ToolTip="Ctrl+D"/>
                     <TextBlock Style="{StaticResource MutedText}" TextWrapping="Wrap" Margin="0,12,0,0"
-                               Text="A cross dissolve between two clips uses a little extra footage from beyond the cut, if the files have it. Change the length or remove it in the inspector."/>
+                               Text="Drag a transition onto a cut or a clip's start or end; double-click one to put it at the start of the selected clip. A transition between two clips uses a little extra footage from beyond the cut, if the files have it. Change it in the inspector."/>
                 </StackPanel>
 
                 <!-- ===== Other tabs (not built yet) ===== -->

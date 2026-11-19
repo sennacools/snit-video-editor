@@ -126,8 +126,9 @@ public sealed class FrameSource(int previewWidth, int previewHeight, double fps)
     }
 
     /// <summary>The clip's colour and effects as one FFmpeg recipe (the same one the export uses).</summary>
-    private static string Recipe(VideoSegment segment)
-        => VideoFilters.Color(segment.Look) + EffectFilters.Chain(segment.Effects ?? []);
+    private string Recipe(VideoSegment segment)
+        => VideoFilters.Color(segment.Look) +
+           EffectFilters.Chain(segment.Effects ?? [], new EffectContext(previewHeight / 1080.0, fps, "p"));
 
     private void Touch(int index)
     {

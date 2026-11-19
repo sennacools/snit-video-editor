@@ -9,8 +9,15 @@ public sealed record VideoSegment(
     long In, long SourceLength, double Speed, bool Reverse,
     ClipLook Look, int MediaWidth, int MediaHeight, Guid ClipId, TitleStyle? Title,
     long FadeInFrames = 0, long FadeOutFrames = 0, long BlackInFrames = 0, long BlackOutFrames = 0, int Slot = 0,
-    IReadOnlyDictionary<string, IReadOnlyList<Keyframe>>? Keyframes = null, IReadOnlyList<ClipEffect>? Effects = null)
+    IReadOnlyDictionary<string, IReadOnlyList<Keyframe>>? Keyframes = null, IReadOnlyList<ClipEffect>? Effects = null,
+    Transition? Enter = null, long EnterFrames = 0, Transition? Leave = null, long LeaveFrames = 0, bool WhiteIn = false, bool WhiteOut = false)
 {
+    /// <summary>What wipes, slides, zooms and flips do to the clip at a frame.</summary>
+    public TransitionState TransitionAt(long frame) => TransitionFormulas.At(Enter, EnterFrames, Leave, LeaveFrames, Start, End, frame);
+
+    /// <summary>Whether a dip at this frame goes through white (rather than black).</summary>
+    public bool WhiteAt(long frame) => frame - Start < End - frame ? WhiteIn : WhiteOut;
+
     /// <summary>The look at a timeline frame, with animation applied.</summary>
     public ClipLook LookAt(long frame) => Keyframes is null ? Look : Core.Keyframes.LookAt(Look, Keyframes, frame - Start);
 
@@ -86,7 +93,8 @@ public static class PreviewPlan
                     useProxies && r.Clip.Media.ProxyPath is string proxy ? proxy : r.Clip.Media.FilePath, r.Clip.Media.Kind,
                     r.Clip.In, r.Clip.SourceLength, r.Clip.Speed, r.Clip.Reverse,
                     r.Clip.Look, r.Clip.Media.Width, r.Clip.Media.Height, r.Original.Id, r.Clip.Title?.Copy(),
-                    r.FadeInFrames, r.FadeOutFrames, r.BlackInFrames, r.BlackOutFrames, r.Slot, r.Clip.Keyframes, r.Clip.Effects))
+                    r.FadeInFrames, r.FadeOutFrames, r.BlackInFrames, r.BlackOutFrames, r.Slot, r.Clip.Keyframes, r.Clip.Effects,
+                    r.Enter, r.EnterFrames, r.Leave, r.LeaveFrames, r.WhiteIn, r.WhiteOut))
                 .ToList()))
             .ToList();
 

@@ -176,6 +176,11 @@
                                                                                      Visibility="{Binding IsSlider, Converter={StaticResource BoolToVisibility}}"/>
                                                             <CheckBox Content="{Binding Label}" IsChecked="{Binding IsOn}" Margin="0,4"
                                                                       Visibility="{Binding IsSwitch, Converter={StaticResource BoolToVisibility}}"/>
+                                                            <DockPanel Margin="0,3" Visibility="{Binding IsChoice, Converter={StaticResource BoolToVisibility}}">
+                                                                <TextBlock Text="{Binding Label}" Width="86" VerticalAlignment="Center"
+                                                                           Foreground="{StaticResource SecondaryTextBrush}"/>
+                                                                <ComboBox ItemsSource="{Binding Options}" SelectedIndex="{Binding SelectedIndex}"/>
+                                                            </DockPanel>
                                                         </Grid>
                                                     </DataTemplate>
                                                 </ItemsControl.ItemTemplate>
@@ -228,17 +233,25 @@
                                 <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
                             </Grid.RowDefinitions>
                             <TextBlock Text="At start" Foreground="{StaticResource SecondaryTextBrush}" VerticalAlignment="Center"/>
                             <ComboBox Grid.Column="1" ItemsSource="{Binding Inspector.TransitionChoices}" DisplayMemberPath="Label"
-                                      SelectedItem="{Binding Inspector.StartKind}"/>
-                            <controls:PropertySlider Grid.Row="1" Grid.ColumnSpan="2" Label="Length" Minimum="0.1"
+                                      SelectedItem="{Binding Inspector.StartKind}" MaxDropDownHeight="360"/>
+                            <ComboBox Grid.Row="1" Grid.Column="1" Margin="0,6,0,0" ItemsSource="{Binding Inspector.TransitionDirections}"
+                                      SelectedIndex="{Binding Inspector.StartDirection}"
+                                      Visibility="{Binding Inspector.HasStartDirection, Converter={StaticResource BoolToVisibility}}"/>
+                            <controls:PropertySlider Grid.Row="2" Grid.ColumnSpan="2" Label="Length" Minimum="0.1"
                                                      Maximum="{Binding Inspector.TransitionMaximum}"
                                                      Value="{Binding Inspector.StartSeconds}" Format="{}{0:0.0} s" Margin="0,4,0,8"/>
-                            <TextBlock Grid.Row="2" Text="At end" Foreground="{StaticResource SecondaryTextBrush}" VerticalAlignment="Center"/>
-                            <ComboBox Grid.Row="2" Grid.Column="1" ItemsSource="{Binding Inspector.TransitionChoices}" DisplayMemberPath="Label"
-                                      SelectedItem="{Binding Inspector.EndKind}"/>
-                            <controls:PropertySlider Grid.Row="3" Grid.ColumnSpan="2" Label="Length" Minimum="0.1"
+                            <TextBlock Grid.Row="3" Text="At end" Foreground="{StaticResource SecondaryTextBrush}" VerticalAlignment="Center"/>
+                            <ComboBox Grid.Row="3" Grid.Column="1" ItemsSource="{Binding Inspector.TransitionChoices}" DisplayMemberPath="Label"
+                                      SelectedItem="{Binding Inspector.EndKind}" MaxDropDownHeight="360"/>
+                            <ComboBox Grid.Row="4" Grid.Column="1" Margin="0,6,0,0" ItemsSource="{Binding Inspector.TransitionDirections}"
+                                      SelectedIndex="{Binding Inspector.EndDirection}"
+                                      Visibility="{Binding Inspector.HasEndDirection, Converter={StaticResource BoolToVisibility}}"/>
+                            <controls:PropertySlider Grid.Row="5" Grid.ColumnSpan="2" Label="Length" Minimum="0.1"
                                                      Maximum="{Binding Inspector.TransitionMaximum}"
                                                      Value="{Binding Inspector.EndSeconds}" Format="{}{0:0.0} s" Margin="0,4,0,0"/>
                         </Grid>

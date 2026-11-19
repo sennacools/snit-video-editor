@@ -457,13 +457,16 @@ public partial class InspectorViewModel : ObservableObject
 
     // ===================== Transitions =====================
 
-    /// <summary>The choices in the transition dropdowns. Null = no transition.</summary>
+    /// <summary>The choices in the transition dropdowns: None, then every transition (grouped by category).</summary>
     public IReadOnlyList<Choice<TransitionKind?>> TransitionChoices { get; } =
-    [
-        new("None", null),
-        new("Cross dissolve", TransitionKind.CrossDissolve),
-        new("Dip to black", TransitionKind.DipToBlack),
-    ];
+        new[] { new Choice<TransitionKind?>("None", null) }
+            .Concat(TransitionCatalog.All
+                .OrderBy(t => TransitionCatalog.Categories.ToList().IndexOf(t.Category))
+                .Select(t => new Choice<TransitionKind?>($"{t.Name}  ·  {t.Category}", t.Kind)))
+            .ToList();
+
+    /// <summary>"From the left", "From the right"… for wipes and slides.</summary>
+    public IReadOnlyList<string> TransitionDirections => TransitionCatalog.Directions;
 
     public bool HasClip => timeline.SelectedClip is not null;
 
@@ -478,31 +481,48 @@ public partial class InspectorViewModel : ObservableObject
     public Choice<TransitionKind?> StartKind
     {
         get => TransitionChoices.First(t => t.Value == StartTransition?.Kind);
-        set => ChangeTransition(atStart: true, value.Value, (long)Math.Round(StartSeconds * timeline.Fps));
+        set => ChangeTransition(atStart: true, value.Value, (long)Math.Round(StartSeconds * timeline.Fps), StartDirection);
     }
 
     public double StartSeconds
     {
         get => (StartTransition?.Frames ?? TransitionPlan.DefaultFrames) / timeline.Fps;
-        set { if (StartTransition is { } t) ChangeTransition(atStart: true, t.Kind, (long)Math.Round(value * timeline.Fps)); }
+        set { if (StartTransition is { } t) ChangeTransition(atStart: true, t.Kind, (long)Math.Round(value * timeline.Fps), t.Direction); }
     }
+
+    /// <summary>Which way the start transition goes (only for wipes and slides).</summary>
+    public int StartDirection
+    {
+        get => StartTransition?.Direction ?? 0;
+        set { if (StartTransition is { } t && value >= 0) ChangeTransition(atStart: true, t.Kind, t.Frames, value); }
+    }
+
+    public bool HasStartDirection => StartTransition is { } t && TransitionCatalog.Find(t.Kind) is { HasDirection: true } or { Style: TransitionStyle.Slide or TransitionStyle.Push };
 
     public Choice<TransitionKind?> EndKind
     {
         get => TransitionChoices.First(t => t.Value == EndTransition?.Kind);
-        set => ChangeTransition(atStart: false, value.Value, (long)Math.Round(EndSeconds * timeline.Fps));
+        set => ChangeTransition(atStart: false, value.Value, (long)Math.Round(EndSeconds * timeline.Fps), EndDirection);
     }
 
     public double EndSeconds
     {
         get => (EndTransition?.Frames ?? TransitionPlan.DefaultFrames) / timeline.Fps;
-        set { if (EndTransition is { } t) ChangeTransition(atStart: false, t.Kind, (long)Math.Round(value * timeline.Fps)); }
+        set { if (EndTransition is { } t) ChangeTransition(atStart: false, t.Kind, (long)Math.Round(value * timeline.Fps), t.Direction); }
     }
+
+    public int EndDirection
+    {
+        get => EndTransition?.Direction ?? 0;
+        set { if (EndTransition is { } t && value >= 0) ChangeTransition(atStart: false, t.Kind, t.Frames, value); }
+    }
+
+    public bool HasEndDirection => EndTransition is { } t && TransitionCatalog.Find(t.Kind) is { HasDirection: true } or { Style: TransitionStyle.Slide or TransitionStyle.Push };
 
     /// <summary>A transition can be at most 4 seconds (and never longer than the clip).</summary>
     public double TransitionMaximum => timeline.SelectedClip is Clip c ? Math.Max(0.1, Math.Min(4, c.Length / timeline.Fps)) : 4;
 
-    private void ChangeTransition(bool atStart, TransitionKind? kind, long frames)
+    private void ChangeTransition(bool atStart, TransitionKind? kind, long frames, int direction)
     {
         if (timeline.SelectedClip is not Clip clip || timeline.IsLocked(clip)) return;
         string property = (atStart ? "TransitionIn" : "TransitionOut") + clip.Id;
@@ -514,7 +534,7 @@ public partial class InspectorViewModel : ObservableObject
             lastChange = property;
             lastChangeVersion = timeline.EditVersion;
         }
-        timeline.SetTransition(clip, atStart, kind, Math.Max(1, frames), saveUndo: false);
+        timeline.SetTransition(clip, atStart, kind, Math.Max(1, frames), saveUndo: false, direction);
     }
 
     // ===================== Speed =====================

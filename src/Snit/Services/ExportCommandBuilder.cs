@@ -79,6 +79,7 @@ public static class ExportCommandBuilder
             Clip clip = rc.Clip;
             bool isStill = clip.Media.Kind is MediaKind.Image or MediaKind.Text;
             bool fadesThrough = rc.FadeInFrames > 0 || rc.FadeOutFrames > 0  // needs see-through edges
+                                || rc.Enter is not null || rc.Leave is not null
                                 || EffectFilters.MakesTransparency(clip.Effects);
             if (clip.Title is TitleStyle title)
             {
@@ -113,13 +114,18 @@ public static class ExportCommandBuilder
                 y = $"(main_h-overlay_h)/2+({ProcessRunner.Num(Math.Round(clip.Look.PositionY * fit, 2))})";
             }
 
+            // Transitions other than a plain dissolve or dip: masks, slides, zooms, flips.
+            var (moves, shiftX, shiftY) = TransitionFilters(rc, projectFps, fps, w, h, titleW, titleH);
+            if (shiftX.Length > 0) x = $"'{x.Trim('\'')}+main_w*({shiftX})'";
+            if (shiftY.Length > 0) y = $"'{y.Trim('\'')}+main_h*({shiftY})'";
+
             string label = $"v{input}";
             filters.Add(
                 $"[{input}:v:0]{speed.TrimStart(',')}{(speed.Length > 0 ? "," : "")}fps={fps},trim=duration={Sec(clip.Length)}," +
                 $"scale={w}:{h}:force_original_aspect_ratio=decrease,setsar=1" +
-                $"{VideoFilters.Color(clip.Look)}{EffectFilters.Chain(clip.Effects)}" +
-                $"{VideoFilters.Fade(rc.BlackInFrames, rc.BlackOutFrames, clip.Length, projectFps, alpha: false)}" +
-                $"{transform}" +
+                $"{VideoFilters.Color(clip.Look)}{EffectFilters.Chain(clip.Effects, new EffectContext(h / 1080.0, settings.FrameRate, $"c{input}x"))}" +
+                $"{VideoFilters.Fade(rc.BlackInFrames, rc.BlackOutFrames, clip.Length, projectFps, alpha: false, rc.WhiteIn, rc.WhiteOut)}" +
+                $"{moves}{transform}" +
                 $"{VideoFilters.Fade(rc.FadeInFrames, rc.FadeOutFrames, clip.Length, projectFps, alpha: true)}," +
                 $"setpts=PTS-STARTPTS+{Sec(clip.Start)}/TB[{label}]");
 
@@ -241,4 +247,74 @@ public static class ExportCommandBuilder
         "h264_amf" => ["-c:v", "hevc_amf", "-quality", "balanced", .. bitrate, "-pix_fmt", "yuv420p"],
         _ => ["-c:v", "libx265", "-preset", "medium", .. bitrate, "-pix_fmt", "yuv420p"],
     };
+
+    /// <summary>
+    /// The FFmpeg steps for a clip's wipe, slide, zoom or flip (see <see cref="TransitionFormulas"/>):
+    /// zoom and squeeze steps plus an alpha mask for the clip's own chain, and extra movement for
+    /// the overlay position (fractions of the frame; empty when it doesn't move).
+    /// </summary>
+    private static (string Chain, string ShiftX, string ShiftY) TransitionFilters(RenderClip rc, double projectFps, string exportFps,
+        int w, int h, int titleW, int titleH)
+    {
+        if (rc.Enter is null && rc.Leave is null) return ("", "", "");
+        Clip clip = rc.Clip;
+        string pf = ProcessRunner.Num(projectFps);
+        string P(string time) => rc.Enter is null ? "1" : $"clip(({time}*{pf}+0.5)/{rc.EnterFrames},0,1)";
+        string Q(string time) => rc.Leave is null ? "0" : $"clip(({time}*{pf}+0.5-{clip.Length - rc.LeaveFrames})/{rc.LeaveFrames},0,1)";
+        static string Put(string formula, string p, string q)
+            => System.Text.RegularExpressions.Regex.Replace(
+                System.Text.RegularExpressions.Regex.Replace(formula, @"\bP\b", $"({p})"), @"\bQ\b", $"({q})");
+
+        var parts = new List<(TransitionFormulas.Parts Parts, Transition T)>();
+        if (rc.Enter is Transition enter) parts.Add((TransitionFormulas.In(enter), enter));
+        if (rc.Leave is Transition leave) parts.Add((TransitionFormulas.Out(leave), leave));
+
+        // The clip's picture size inside the export (for zoom and flip, which need a fixed size).
+        (int mw, int mh) = clip.Title is not null ? (titleW, titleH) : (clip.Media.Width, clip.Media.Height);
+        double fit = mw > 0 && mh > 0 ? Math.Min((double)w / mw, (double)h / mh) : 1;
+        int fw = mw > 0 ? Math.Max(2, (int)Math.Round(mw * fit)) : w, fh = mh > 0 ? Math.Max(2, (int)Math.Round(mh * fit)) : h;
+
+        var chain = new List<string>();
+
+        // Zoom: zoompan keeps the picture size fixed while zooming into the middle.
+        var zooms = parts.Where(x => x.Parts.Zoom != "1").Select(x => Put(x.Parts.Zoom, P($"(in/{exportFps})"), Q($"(in/{exportFps})"))).ToList();
+        if (zooms.Count > 0)
+            chain.Add($"zoompan=z='{string.Join("*", zooms)}':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=1:s={fw}x{fh}:fps={exportFps}");
+
+        // Squeeze (flip over): narrower every frame, on a fixed see-through canvas.
+        var squeezes = parts.Where(x => x.Parts.Squeeze != "1").Select(x => Put(x.Parts.Squeeze, P("t"), Q("t"))).ToList();
+        if (squeezes.Count > 0)
+            chain.Add($"format=rgba,scale=w='max(2,trunc(iw*({string.Join("*", squeezes)})/2)*2)':h=ih:eval=frame," +
+                      $"pad=w={fw + 4}:h=ih:x=(ow-iw)/2:y=0:color=black@0");
+
+        // Opacity and wipe masks, only during the transition frames.
+        var alpha = new List<string>();
+        foreach (var (part, _) in parts)
+        {
+            if (part.Opacity != "1") alpha.Add(Put(part.Opacity, P("T"), Q("T")));
+            if (part.Mask is string mask) alpha.Add(Put(mask, P("T"), Q("T")));
+        }
+        if (alpha.Count > 0)
+        {
+            var during = new List<string>();
+            if (rc.Enter is not null) during.Add($"lt(t,{ProcessRunner.Num(rc.EnterFrames / projectFps)})");
+            if (rc.Leave is not null) during.Add($"gte(t,{ProcessRunner.Num((clip.Length - rc.LeaveFrames) / projectFps)})");
+            chain.Add($"format=rgba,geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':a='alpha(X,Y)*clip({string.Join("*", alpha)},0,1)'" +
+                      $":enable='{string.Join("+", during)}'");
+        }
+
+        // Movement (slide, push): in the overlay, with the timeline time t.
+        string local = $"(t-{ProcessRunner.Num(clip.Start / projectFps)})";
+        var sx = new List<string>();
+        var sy = new List<string>();
+        foreach (var (part, t) in parts.Where(x => x.Parts.Shift != "0"))
+        {
+            var (vx, vy) = TransitionCatalog.Vector(t.Direction);
+            string shift = Put(part.Shift, P(local), Q(local));
+            if (vx != 0) sx.Add($"{vx}*{shift}");
+            if (vy != 0) sy.Add($"{vy}*{shift}");
+        }
+
+        return (chain.Count == 0 ? "" : "," + string.Join(",", chain), string.Join("+", sx), string.Join("+", sy));
+    }
 }

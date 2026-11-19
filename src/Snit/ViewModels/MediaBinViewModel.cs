@@ -34,7 +34,7 @@ public partial class MediaBinViewModel : ObservableObject
     [ObservableProperty]
     private string searchText = "";
 
-    /// <summary>Shown while importing, e.g. "Importing 2 of 5…". Empty when idle.</summary>
+    /// <summary>Shown while importing, e.g. "Importing 2 of 5â€¦". Empty when idle.</summary>
     [ObservableProperty]
     private string importStatus = "";
 
@@ -42,6 +42,43 @@ public partial class MediaBinViewModel : ObservableObject
     private MediaItem? selectedItem;
 
     partial void OnSearchTextChanged(string value) => Items.Refresh();
+
+    // ===================== Effects and transitions tabs =====================
+
+    /// <summary>Typed in the search box of the Effects and Transitions tabs.</summary>
+    [ObservableProperty]
+    private string effectSearch = "";
+
+    partial void OnEffectSearchChanged(string value)
+    {
+        Effects.Refresh();
+        OnPropertyChanged(nameof(TransitionGroups));
+    }
+
+    /// <summary>The transitions that match the search, by category (for the tiles in the Transitions tab).</summary>
+    public IReadOnlyList<TransitionGroup> TransitionGroups
+        => TransitionCatalog.Categories
+            .Select(c => new TransitionGroup(c, TransitionCatalog.All.Where(t => t.Category == c && Matches(t.Name, t.Description, t.Category)).ToList()))
+            .Where(g => g.Items.Count > 0)
+            .ToList();
+
+    private bool Matches(params string[] texts)
+        => string.IsNullOrWhiteSpace(EffectSearch)
+           || texts.Any(t => t.Contains(EffectSearch.Trim(), StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>All effects, grouped by category (like Premiere's Video Effects folders), filtered by the search.</summary>
+    public ICollectionView Effects => effects ??= MakeEffectsView();
+    private ICollectionView? effects;
+
+    private ICollectionView MakeEffectsView()
+    {
+        var view = new ListCollectionView(EffectCatalog.All
+            .OrderBy(e => EffectCatalog.Categories.ToList().IndexOf(e.Category)).ThenBy(e => e.Name).ToList());
+        view.GroupDescriptions.Add(new PropertyGroupDescription(nameof(EffectDefinition.Category)));
+        view.Filter = o => o is EffectDefinition e && Matches(e.Name, e.Description, e.Category);
+        return view;
+    }
+
 
     public void Load(Project newProject)
     {
@@ -93,7 +130,7 @@ public partial class MediaBinViewModel : ObservableObject
         int done = 0;
         foreach (string path in paths)
         {
-            ImportStatus = $"Importing {++done} of {paths.Count}…";
+            ImportStatus = $"Importing {++done} of {paths.Count}â€¦";
             if (project.Media.Any(m => string.Equals(m.FilePath, Path.GetFullPath(path), StringComparison.OrdinalIgnoreCase)))
                 continue; // already in the bin
 
@@ -144,7 +181,7 @@ public partial class MediaBinViewModel : ObservableObject
     /// <summary>Raised when a proxy is ready (the preview then reads from it).</summary>
     public event Action? ProxiesChanged;
 
-    /// <summary>Right-click → Make proxy: a small copy for a smooth preview.</summary>
+    /// <summary>Right-click â†’ Make proxy: a small copy for a smooth preview.</summary>
     [RelayCommand]
     private Task CreateProxyAsync(MediaItem? item)
     {
@@ -152,11 +189,11 @@ public partial class MediaBinViewModel : ObservableObject
         return item is null ? Task.CompletedTask : MakeProxiesAsync([item]);
     }
 
-    /// <summary>Clip → Make proxies for all videos.</summary>
+    /// <summary>Clip â†’ Make proxies for all videos.</summary>
     [RelayCommand]
     private Task CreateAllProxiesAsync() => MakeProxiesAsync(project.Media.ToList());
 
-    /// <summary>Makes the missing proxies one after the other (each shows "Making proxy…" on its tile).</summary>
+    /// <summary>Makes the missing proxies one after the other (each shows "Making proxyâ€¦" on its tile).</summary>
     public async Task MakeProxiesAsync(IReadOnlyList<MediaItem> items)
     {
         var todo = items.Where(m => ProxyMaker.CanHaveProxy(m) && !m.HasProxy && !m.IsMakingProxy).ToList();
@@ -187,7 +224,7 @@ public partial class MediaBinViewModel : ObservableObject
         if (item is null) return;
         if (item.IsSequence)
         {
-            MessageBox.Show("To delete a sequence, open it (double-click) and choose Timeline → Delete sequence.",
+            MessageBox.Show("To delete a sequence, open it (double-click) and choose Timeline â†’ Delete sequence.",
                 "Remove media", MessageBoxButton.OK, MessageBoxImage.Information);
             return;
         }
@@ -211,3 +248,6 @@ public partial class MediaBinViewModel : ObservableObject
     /// <summary>Makes the thumbnail again (after a nested sequence was rendered).</summary>
     public void RefreshThumbnail(MediaItem item) => _ = LoadThumbnailAsync(item);
 }
+
+/// <summary>One category of transitions in the Transitions tab.</summary>
+public sealed record TransitionGroup(string Name, IReadOnlyList<TransitionDefinition> Items);

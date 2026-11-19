@@ -91,12 +91,21 @@ public partial class EffectParameterViewModel(EffectRowViewModel row, EffectPara
     public double Maximum => parameter.Max;
     public string Format => parameter.Format;
     public bool IsSwitch => parameter.IsSwitch;
-    public bool IsSlider => !parameter.IsSwitch;
+    public bool IsChoice => parameter.IsChoice;
+    public bool IsSlider => !parameter.IsSwitch && !parameter.IsChoice;
+    public IReadOnlyList<string> Options => parameter.Options ?? [];
+
+    /// <summary>The chosen option of a dropdown setting.</summary>
+    public int SelectedIndex
+    {
+        get => (int)Math.Round(row.Value(parameter.Name));
+        set { if (value >= 0) row.SetValue(parameter.Name, value); }
+    }
 
     public double Value
     {
         get => row.Value(parameter.Name);
-        set => row.SetValue(parameter.Name, Math.Round(value, 1));
+        set => row.SetValue(parameter.Name, Math.Round(value, parameter.Max - parameter.Min <= 10 ? 2 : 1));
     }
 
     public bool IsOn

@@ -32,10 +32,25 @@ It's built with C#, WPF and FFmpeg.
 - **Keyframes**: animate scale, rotation, opacity and position with the diamond next to each
   slider; values change evenly between keyframes
 - **Speed** from 10% to 400% and **reverse**, for video and its sound together
-- **Transitions**: cross-dissolve and dip to black (from the Transitions tab, or Ctrl+D at a cut);
-  the clip's sound cross-fades along. A dissolve uses footage just beyond the cut if the files have it
-- **Effects** (Effects tab): blur, sharpen, crop, vignette, flip, green screen (chroma key) and
-  colour LUTs (.cube). Drag one onto a clip, then change, switch off or remove it in the inspector
+- **Transitions** (32, in Premiere's groups, with search): Cross / Film / Additive / Non-Additive / Dither
+  Dissolve, Dip to Black and White; Iris Round, Box, Diamond, Cross; Wipe, Band Wipe, Barn Doors, Checker
+  Wipe, CheckerBoard, Clock Wipe, Gradient Wipe, Inset, Paint Splatter, Pinwheel, Radial Wipe, Random
+  Blocks, Random Wipe, Spiral Boxes, Venetian Blinds, Wedge Wipe, Zig-Zag Blocks; Slide and Push; Cross
+  Zoom; Flip Over. Wipes and slides have a direction. Drag one onto a cut or a clip edge (Ctrl+D: a cross
+  dissolve at the playhead cut); the sound cross-fades along. Each wipe shape is one formula that FFmpeg
+  uses for the export and Snit itself works out for the preview, so they match
+- **Effects** (64, in Premiere's groups, with search): Adjust (Brightness & Contrast, Levels, Channel
+  Mixer, ProcAmp, Auto Contrast / Levels / Color, Extract, Lighting), Blur & Sharpen (Fast, Gaussian,
+  Directional, Camera and Channel Blur, Unsharp Mask, Sharpen), Invert, Color Correction (Tint, Leave
+  Color, Change Color, Color Balance HLS / RGB, Video Limiter, LUTs), Distort (Mirror, Lens Distortion,
+  Spherize, Corner Pin, Wave Warp, Twirl, Offset, Magnify, Turbulent Displace, Warp Stabilizer),
+  Generate (Grid, Checkerboard, Ramp, Circle, Lens Flare), Black & White, Gamma, Keying (Ultra Key,
+  Color Key, Luma Key, Alpha Adjust), Noise, Median, Dust & Scratches, Drop Shadow, Basic 3D, Stylize
+  (Vignette, Emboss, Color Emboss, Find Edges, Mosaic, Posterize, Solarize, Threshold, Strobe Light,
+  Replicate), Echo, Posterize Time, Crop, Flips, Edge Feather, and Linear / Radial Wipe, Venetian Blinds
+  and Block Dissolve as effects. Drag one onto a clip, then change, switch off or remove it in the inspector
+  - Not included (they need things FFmpeg can't do): Morph Cut, Page Peel / Page Turn, Cube Spin, Band
+    Slide, Split, the VR effects, Lightning, Cell Pattern, Write-on, Track Matte Key, Roughen Edges
 - **Color workspace** (Color button, top right): scopes on the left (waveform, RGB parade,
   vectorscope, histogram) measuring the program picture, and a Lumetri-style panel on the right:
   basic correction with tint, three colour wheels (shadows, midtones, highlights) and RGB curves

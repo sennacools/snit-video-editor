@@ -116,7 +116,17 @@ public partial class MediaBinView : UserControl
 
     // ---- Transition tiles in the Transitions tab ----
 
-    private void TransitionTile_MouseDown(object sender, MouseButtonEventArgs e) => pressPoint = e.GetPosition((IInputElement)sender);
+    private void TransitionTile_MouseDown(object sender, MouseButtonEventArgs e)
+    {
+        pressPoint = e.GetPosition((IInputElement)sender);
+        if (e.ClickCount == 2 && sender is FrameworkElement { Tag: TransitionKind kind } && DataContext is MainViewModel main
+            && main.Timeline.SelectedClip is Clip clip)
+        {
+            main.Timeline.SetTransition(clip, atStart: true, kind, TransitionPlan.DefaultFrames);
+            pressPoint = null;
+            e.Handled = true;
+        }
+    }
 
     private void TransitionTile_MouseMove(object sender, MouseEventArgs e)
     {
@@ -126,7 +136,7 @@ public partial class MediaBinView : UserControl
             Math.Abs(now.Y - start.Y) < SystemParameters.MinimumVerticalDragDistance)
             return;
         pressPoint = null;
-        var kind = Enum.Parse<TransitionKind>((string)tile.Tag);
+        var kind = tile.Tag is TransitionKind k ? k : Enum.Parse<TransitionKind>((string)tile.Tag);
         DragDrop.DoDragDrop(tile, new DataObject(TimelineCanvas.TransitionDragFormat, kind), DragDropEffects.Copy);
     }
 
